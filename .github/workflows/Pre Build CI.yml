@@ -1,9 +1,6 @@
-name: Netch CI
+name: Pre Build CI
 
-on:
-  push:
-    tags:
-      - '1.*.*'
+on: push
 
 jobs:
   build:
@@ -38,24 +35,23 @@ jobs:
       with:
         name: Netch
         path: Netch\bin\x64\Release\win-x64
-  
+          
     - name: Release
       uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-      if: startsWith(github.ref, 'refs/tags/')
       with:
-        name: ${{ env.GITHUB_TAG_NAME }}
+        tag_name: Pre-${{github.run_number}}
+        name: Pre Release - ${{github.run_number}}
         prerelease: true
-        draft: true
+        draft: false
         files: |
           C:\builtfiles\Netch.zip
         body: |
           [![](https://img.shields.io/badge/Telegram-Channel-blue)](https://t.me/Netch) [![](https://img.shields.io/badge/Telegram-Group-green)](https://t.me/Netch_Discuss_Group)
-
-          ## 更新日志
-          * 这是 GitHub Action 自动化部署，更新日志应该很快会手动更新
-
+          
+          ${{ github.event.head_commit.message }}
+          
           ## 校验和
           | 文件名 | SHA256 |
           | :- | :- |
