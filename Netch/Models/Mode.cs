@@ -37,6 +37,17 @@ namespace Netch.Models
         public List<string> Rule = new List<string>();
 
         /// <summary>
+        ///    进程模式IP过滤器
+        ///    true 除规则内IP全走代理 默认
+        ///    false 仅代理规则内IP
+        /// </summary>
+        public bool ProcesssIPFillter() {
+            if (Remark.Contains("IPFillter=false"))
+                return false;
+            return true;
+        }
+
+        /// <summary>
         ///		获取备注
         /// </summary>
         /// <returns>备注</returns>

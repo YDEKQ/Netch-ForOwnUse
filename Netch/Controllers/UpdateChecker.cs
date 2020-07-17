@@ -14,12 +14,12 @@ namespace Netch.Controllers
 
         private const int DefaultGetTimeout = 30000;
 
-        public const string Owner = @"NetchX";
-        public const string Repo = @"Netch";
+        public const string Owner = @"AmazingDM";
+        public const string Repo = @"Netch-ForOwnUse";
 
         public const string Name = @"Netch";
         public const string Copyright = @"Copyright © 2019 - 2020";
-        public const string Version = @"1.4.11";
+        public const string Version = @"1.5.6";
 
         public string LatestVersionNumber;
         public string LatestVersionUrl;

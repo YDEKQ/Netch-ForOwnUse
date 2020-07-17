@@ -176,6 +176,7 @@
     "STUN Server": "STUN 服务器",
     "STUN Server Port": "STUN 服务器端口",
     "Custom ACL": "自定义 ACL 规则",
+    "Process whitelist mode": "进程白名单模式（全局）",
     "Language": "语言",
     "Saved.": "保存成功",
 
@@ -186,6 +187,7 @@
     "Show": "显示",
     "Exit": "退出",
     "Unable to start? Click me to download": "无法启动？点我下载依赖",
+    "xxx" : "DM bUg Ver",
 
     "Bypass LAN": "[网页代理] 绕过局域网",
     "Bypass LAN (Non System Proxy)": "[网页代理] 绕过局域网（不设置系统代理）",

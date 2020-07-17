@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.ServiceProcess;
@@ -60,7 +61,7 @@ namespace Netch.Controllers
             }
         }
 
-        public override bool Start(Server server, Mode mode)
+        /*public override bool Start(Server server, Mode mode)
         {
             if (!CheckDriverReady())
             {
@@ -118,8 +119,198 @@ namespace Netch.Controllers
             }
 
             return false;
-        }
+        }*/
 
+
+        private static string[] _sysDns = { };
+        public override bool Start(Server server, Mode mode)
+        {
+            if (!CheckDriverReady())
+            {
+                if (File.Exists(SystemDriver))
+                    UninstallDriver();
+                if (!InstallDriver())
+                    return false;
+            }
+
+            //代理进程
+            var processes = "";
+            //IP过滤
+            var processesIPFillter = "";
+
+            //开启进程白名单模式
+            if (!Global.Settings.ProcessWhitelistMode)
+            {
+                processes += "NTT.exe,";
+            }
+
+            foreach (var proc in mode.Rule)
+            {
+                //添加进程代理
+                if (proc.EndsWith(".exe"))
+                {
+                    processes += proc;
+                    processes += ",";
+                }
+                else
+                {
+                    //添加IP过滤器
+                    processesIPFillter += proc;
+                    processesIPFillter += ",";
+                }
+            }
+            processes = processes.Substring(0, processes.Length - 1);
+
+            Instance = GetProcess("bin\\Redirector.exe");
+            var fallback = "";
+
+
+            if (!File.Exists("bin\\Redirector.exe"))
+            {
+                return false;
+            }
+            Instance.StartInfo.FileName = "bin\\Redirector.exe";
+
+            if (server.Type != "Socks5")
+            {
+                fallback += $"-rtcp 127.0.0.1:{Global.Settings.Socks5LocalPort}";
+
+                fallback = StartUDPServer(fallback);
+            }
+            else
+            {
+                var result = DNS.Lookup(server.Hostname);
+                if (result == null)
+                {
+                    Logging.Info("无法解析服务器 IP 地址");
+                    return false;
+                }
+
+                fallback += $"-rtcp {result}:{server.Port}";
+
+                if (!string.IsNullOrWhiteSpace(server.Username) && !string.IsNullOrWhiteSpace(server.Password))
+                {
+                    fallback += $" -username \"{server.Username}\" -password \"{server.Password}\"";
+                }
+
+                if (Global.Settings.UDPServer)
+                {
+                    if (Global.Settings.UDPServerIndex == -1)
+                    {
+                        fallback += $" -rudp {result}:{server.Port}";
+                    }
+                    else
+                    {
+                        fallback = StartUDPServer(fallback);
+                    }
+                }
+                else
+                {
+                    fallback += $" -rudp {result}:{server.Port}";
+                }
+            }
+
+            //开启进程白名单模式
+            if (Global.Settings.ProcessWhitelistMode)
+            {
+                processes += ",ck-client.exe,Privoxy.exe,Redirector.exe,Shadowsocks.exe,ShadowsocksR.exe,simple-obfs.exe,Trojan.exe,tun2socks.exe,unbound.exe,v2ctl.exe,v2ray-plugin.exe,v2ray.exe,wv2ray.exe,tapinstall.exe,Netch.exe";
+                fallback += " -bypass true ";
+            }
+            else
+            {
+                fallback += " -bypass false";
+            }
+
+            fallback += $" -p \"{processes}\"";
+
+            // true  除规则内IP全走代理
+            // false 仅代理规则内IP
+            if (processesIPFillter.Length > 0)
+            {
+                if (mode.ProcesssIPFillter())
+                {
+                    fallback += $" -bypassip true";
+                }
+                else
+                {
+                    fallback += $" -bypassip false";
+                }
+                fallback += $" -fip \"{processesIPFillter}\"";
+            }
+            else
+            {
+                fallback += $" -bypassip true";
+            }
+
+            //进程模式代理IP日志打印
+            if (Global.Settings.ProcessProxyIPLog)
+            {
+                fallback += " -printProxyIP true";
+            }
+            else
+            {
+                fallback += " -printProxyIP false";
+            }
+
+            if (!Global.Settings.ProcessNoProxyForUdp)
+            {
+                //开启进程UDP代理
+                fallback += " -udpEnable true";
+            }
+            else
+            {
+                fallback += " -udpEnable false";
+            }
+
+            Logging.Info($"Redirector : {fallback}");
+
+            if (File.Exists("logging\\redirector.log"))
+                File.Delete("logging\\redirector.log");
+
+            Instance.StartInfo.Arguments = fallback;
+            State = Models.State.Starting;
+            Instance.Start();
+            Instance.BeginOutputReadLine();
+            Instance.BeginErrorReadLine();
+
+            for (var i = 0; i < 1000; i++)
+            {
+                try
+                {
+                    if (File.Exists("logging\\redirector.log"))
+                    {
+                        FileStream fs = new FileStream("logging\\redirector.log", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                        StreamReader sr = new StreamReader(fs, System.Text.Encoding.Default);
+
+                        if (sr.ReadToEnd().Contains("Redirect TCP to"))
+                        {
+
+                            State = State.Started;
+
+                            //备份并替换系统DNS
+                            _sysDns = DNS.getSystemDns();
+                            string[] dns = { "1.1.1.1", "8.8.8.8" };
+                            DNS.SetDNS(dns);
+
+                            return true;
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logging.Error(e.Message);
+                    return true;
+                }
+                finally
+                {
+                    Thread.Sleep(10);
+                }
+            }
+
+            Logging.Info("NF 进程启动超时");
+            Stop();
+            return false;
+        }
         private bool RestartService()
         {
             try
@@ -256,6 +447,18 @@ namespace Netch.Controllers
         public override void Stop()
         {
             StopInstance();
+            //恢复系统DNS
+            DNS.SetDNS(_sysDns);
+            try
+            {
+                if (UDPServerInstance == null || UDPServerInstance.HasExited) return;
+                UDPServerInstance.Kill();
+                UDPServerInstance.WaitForExit();
+            }
+            catch (Exception e)
+            {
+                Logging.Error($"停止 {MainFile}.exe 错误：\n" + e);
+            }
         }
 
         /// <summary>
@@ -269,5 +472,132 @@ namespace Netch.Controllers
         /// <param name="upload">上传</param>
         /// <param name="download">下载</param>
         public delegate void BandwidthUpdateHandler(long upload, long download);
+
+        /// <summary>
+        ///     UDP代理进程实例
+        /// </summary>
+        public Process UDPServerInstance;
+
+        private string StartUDPServer(string fallback)
+        {
+            if (Global.Settings.UDPServer)
+            {
+                if (Global.Settings.UDPServerIndex == -1)
+                {
+                    fallback += $" -rudp 127.0.0.1:{Global.Settings.Socks5LocalPort}";
+                }
+                else
+                {
+                    Models.Server UDPServer = Global.Settings.Server.AsReadOnly()[Global.Settings.UDPServerIndex];
+
+                    var result = Utils.DNS.Lookup(UDPServer.Hostname);
+                    if (result == null)
+                    {
+                        Utils.Logging.Info("无法解析服务器 IP 地址");
+                        return "error";
+                    }
+                    var UDPServerHostName = result.ToString();
+
+                    if (UDPServer.Type != "Socks5")
+                    {
+                        //启动UDP分流服务支持SS/SSR/Trojan
+                        if (UDPServer.Type == "SS")
+                        {
+                            UDPServerInstance = GetProcess("bin\\Shadowsocks.exe");
+                            UDPServerInstance.StartInfo.Arguments = $"-s {UDPServerHostName} -p {UDPServer.Port} -b {Global.Settings.LocalAddress} -l {Global.Settings.Socks5LocalPort + 1} -m {UDPServer.EncryptMethod} -k \"{UDPServer.Password}\" -u";
+                        }
+
+                        if (UDPServer.Type == "SSR")
+                        {
+                            UDPServerInstance = GetProcess("bin\\ShadowsocksR.exe");
+                            UDPServerInstance.StartInfo.Arguments = $"-s {UDPServerHostName} -p {UDPServer.Port} -k \"{UDPServer.Password}\" -m {UDPServer.EncryptMethod} -t 120";
+
+                            if (!string.IsNullOrEmpty(UDPServer.Protocol))
+                            {
+                                UDPServerInstance.StartInfo.Arguments += $" -O {UDPServer.Protocol}";
+
+                                if (!string.IsNullOrEmpty(UDPServer.ProtocolParam))
+                                {
+                                    UDPServerInstance.StartInfo.Arguments += $" -G \"{UDPServer.ProtocolParam}\"";
+                                }
+                            }
+
+                            if (!string.IsNullOrEmpty(UDPServer.OBFS))
+                            {
+                                UDPServerInstance.StartInfo.Arguments += $" -o {UDPServer.OBFS}";
+
+                                if (!string.IsNullOrEmpty(UDPServer.OBFSParam))
+                                {
+                                    UDPServerInstance.StartInfo.Arguments += $" -g \"{UDPServer.OBFSParam}\"";
+                                }
+                            }
+
+                            UDPServerInstance.StartInfo.Arguments += $" -b {Global.Settings.LocalAddress} -l {Global.Settings.Socks5LocalPort + 1} -u";
+                        }
+
+
+                        if (UDPServer.Type == "TR")
+                        {
+
+                            File.WriteAllText("data\\UDPServerlast.json", Newtonsoft.Json.JsonConvert.SerializeObject(new Models.Trojan()
+                            {
+                                local_addr = Global.Settings.LocalAddress,
+                                local_port = Global.Settings.Socks5LocalPort + 1,
+                                remote_addr = UDPServerHostName,
+                                remote_port = UDPServer.Port,
+                                password = new List<string>()
+                                    {
+                                      UDPServer.Password
+                                    }
+                            }));
+
+                            UDPServerInstance = GetProcess("bin\\Trojan.exe");
+                            UDPServerInstance.StartInfo.Arguments = "-c ..\\data\\UDPServerlast.json";
+
+                        }
+
+                        Utils.Logging.Info($"UDPServer : {UDPServerInstance.StartInfo.Arguments}");
+                        File.Delete("logging\\UDPServer.log");
+                        UDPServerInstance.OutputDataReceived += (sender, e) =>
+                        {
+                            try
+                            {
+                                File.AppendAllText("logging\\UDPServer.log", string.Format("{0}\r\n", e.Data));
+                            }
+                            catch (Exception)
+                            {
+                            }
+                        };
+                        UDPServerInstance.ErrorDataReceived += (sender, e) =>
+                        {
+                            try
+                            {
+                                File.AppendAllText("logging\\UDPServer.log", string.Format("{0}\r\n", e.Data));
+                            }
+                            catch (Exception)
+                            {
+                            }
+                        };
+
+                        UDPServerInstance.Start();
+                        UDPServerInstance.BeginOutputReadLine();
+                        UDPServerInstance.BeginErrorReadLine();
+
+
+                        fallback += $" -rudp 127.0.0.1:{Global.Settings.Socks5LocalPort + 1}";
+                    }
+                    else
+                    {
+                        fallback += $" -rudp {UDPServerHostName}:{UDPServer.Port}";
+                    }
+
+                }
+            }
+            else
+            {
+                fallback += $" -rudp 127.0.0.1:{Global.Settings.Socks5LocalPort}";
+            }
+            return fallback;
+        }
     }
 }

@@ -183,5 +183,30 @@ namespace Netch.Models
         ///     语言设置
         /// </summary>
         public string Language = "System";
+
+        /// <summary>
+        ///     进程白名单模式
+        /// </summary>
+        public bool ProcessWhitelistMode = false;
+
+        /// <summary>
+        ///     TCP UDP分流
+        /// </summary>
+        public bool UDPServer = false;
+
+        /// <summary>
+        ///     UDPServerIndex
+        /// </summary>
+        public int UDPServerIndex = 0;
+
+        /// <summary>
+        ///     进程模式不代理UDP
+        /// </summary>
+        public bool ProcessNoProxyForUdp = false;
+
+        /// <summary>
+        ///     进程模式打印已代理IP日志 5s/次 在redirector.log中循环打印
+        /// </summary>
+        public bool ProcessProxyIPLog = false;
     }
 }

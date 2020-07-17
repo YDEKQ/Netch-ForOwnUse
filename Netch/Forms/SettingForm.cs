@@ -1,7 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Net;
+using System.Text;
 using System.Windows.Forms;
+using Netch.Properties;
 using Netch.Utils;
 using TaskScheduler;
 
@@ -106,11 +110,31 @@ namespace Netch.Forms
             LanguageLabel.Text = i18N.Translate(LanguageLabel.Text);
             LanguageComboBox.Items.AddRange(i18N.GetTranslateList().ToArray());
             LanguageComboBox.SelectedItem = Global.Settings.Language;
+            ProcessWhitelistModeCheckbox.Text = i18N.Translate(ProcessWhitelistModeCheckbox.Text);
+            ProcessWhitelistModeCheckbox.Checked = Global.Settings.ProcessWhitelistMode;
+
+            ProcessNoProxyForUdpcheckBox.Checked = Global.Settings.ProcessNoProxyForUdp;
+            PrintProxyIPCheckBox.Checked = Global.Settings.ProcessProxyIPLog;
+
+            UDPServerCheckBox.Checked = Global.Settings.UDPServer;
         }
 
         private void SettingForm_Load(object sender, EventArgs e)
         {
             InitText();
+
+            if (Global.Settings.UDPServer)
+            {
+                ShowUDPServerComboBox();
+            }
+            else
+            {
+                UDPServerComboBox.Visible = false;
+            }
+
+            LanguageLabel.Text = i18N.Translate(LanguageLabel.Text);
+            LanguageComboBox.Items.AddRange(i18N.GetTranslateList().ToArray());
+            LanguageComboBox.SelectedItem = Global.Settings.Language;
 
             if (Global.Settings.TUNTAP.DNS.Count > 0)
             {
@@ -171,7 +195,49 @@ namespace Netch.Forms
             Global.Settings.MinimizeWhenStarted = MinimizeWhenStartedCheckBox.Checked;
             Global.Settings.RunAtStartup = RunAtStartup.Checked;
             Global.Settings.BootShadowsocksFromDLL = BootShadowsocksFromDLLCheckBox.Checked;
+            Global.Settings.ProcessWhitelistMode = ProcessWhitelistModeCheckbox.Checked;
+            Global.Settings.UDPServer = UDPServerCheckBox.Checked;
+            Global.Settings.UDPServerIndex = UDPServerComboBox.SelectedIndex - 1;
             Global.Settings.Language = LanguageComboBox.SelectedItem.ToString();
+            Global.Settings.ProcessNoProxyForUdp = ProcessNoProxyForUdpcheckBox.Checked;
+            Global.Settings.ProcessProxyIPLog = PrintProxyIPCheckBox.Checked;
+
+            // 加载系统语言
+            if (Global.Settings.Language.Equals("System"))
+            {
+                // 得到当前线程语言代码
+                var culture = CultureInfo.CurrentCulture.Name;
+
+                // 尝试加载内置中文语言
+                if (culture == "zh-CN")
+                {
+                    // 加载语言
+                    i18N.Load(Encoding.UTF8.GetString(Resources.zh_CN));
+                }
+
+                // 从外置文件中加载语言
+                if (File.Exists($"i18n\\{culture}"))
+                {
+                    // 加载语言
+                    i18N.Load(File.ReadAllText($"i18n\\{culture}"));
+                }
+            }
+
+            if (Global.Settings.Language.Equals("zh-CN"))
+            {
+                // 加载内置中文
+                i18N.Load(Encoding.UTF8.GetString(Resources.zh_CN));
+            }
+            else if (Global.Settings.Language.Equals("en-US"))
+            {
+                // 加载内置英文
+                i18N.Load(Global.Settings.Language);
+            }
+            else if (File.Exists($"i18n\\{Global.Settings.Language}"))
+            {
+                // 从外置文件中加载语言
+                i18N.Load(File.ReadAllText($"i18n\\{Global.Settings.Language}"));
+            }
 
             // 开机自启判断
             var scheduler = new TaskSchedulerClass();
@@ -401,6 +467,27 @@ namespace Netch.Forms
             Configuration.Save();
             MessageBoxX.Show(i18N.Translate("Saved"));
             Close();
+        }
+
+        private void UDPServerCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            UDPServerComboBox.Visible = UDPServerCheckBox.Checked;
+            if (UDPServerCheckBox.Checked)
+            {
+                ShowUDPServerComboBox();
+            }
+        }
+
+        private void ShowUDPServerComboBox()
+        {
+            UDPServerComboBox.Items.Clear();
+            UDPServerComboBox.Items.Add(new Models.Server
+            {
+                Hostname = "FakeServer",
+                Type = "FakeServer"
+            });
+            UDPServerComboBox.Items.AddRange(Global.Settings.Server.ToArray());
+            UDPServerComboBox.SelectedIndex = Global.Settings.UDPServerIndex + 1;
         }
     }
 }

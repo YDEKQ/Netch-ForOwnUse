@@ -227,7 +227,7 @@ namespace Netch.Forms
             UsedBandwidthLabel.Text = $@"{i18N.Translate("Used", ": ")}0 KB";
             UpdateStatus();
 
-            VersionLabel.Text = UpdateChecker.Version;
+            VersionLabel.Text += UpdateChecker.Version;
         }
 
         #region MISC
