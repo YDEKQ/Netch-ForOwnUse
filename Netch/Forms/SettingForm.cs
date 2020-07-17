@@ -464,6 +464,26 @@ namespace Netch.Forms
             Global.Settings.TUNTAP.ProxyDNS = ProxyDNSCheckBox.Checked;
             Global.Settings.TUNTAP.UseFakeDNS = UseFakeDNSCheckBox.Checked;
 
+            #region 检查端口是否被占用
+            if (PortHelper.PortInUse(Global.Settings.Socks5LocalPort))
+            {
+                MessageBoxX.Show(i18N.Translate("The Socks5 port is in use. Please reset."));
+                return;
+            }
+
+            if (PortHelper.PortInUse(Global.Settings.HTTPLocalPort))
+            {
+                MessageBoxX.Show(i18N.Translate("The HTTP port is in use. Please reset."));
+                return;
+            }
+
+            if (PortHelper.PortInUse(Global.Settings.RedirectorTCPPort, PortType.TCP))
+            {
+                MessageBoxX.Show(i18N.Translate("The RedirectorTCP port is in use. Please reset."));
+                return;
+            }
+            #endregion
+
             Configuration.Save();
             MessageBoxX.Show(i18N.Translate("Saved"));
             Close();

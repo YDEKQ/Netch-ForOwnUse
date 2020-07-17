@@ -3,6 +3,7 @@
     "Information": "信息",
     "Error": "错误",
 
+    "If this is your first time using this software,\n please check http://netch.org to install supports first,\n or the program may report errors.": "如果你是第一次使用本软件，\n请务必前往http://netch.org安装程序所需依赖，\n否则程序将无法正常运行！",
     "Netch is already running": "Netch 已经在运行中",
     "Netch is not compatible with your system.": "Netch 和你的系统不兼容",
     "Current arch of Netch:": "当前 Netch 架构：",
@@ -187,7 +188,13 @@
     "Show": "显示",
     "Exit": "退出",
     "Unable to start? Click me to download": "无法启动？点我下载依赖",
-    "xxx" : "DM bUg Ver",
+
+    "The Socks5 port is in use. Click OK to modify it.": "Socks5端口已被占用，点击确定前往修改",
+    "The Socks5 port is in use. Please reset.": "Socks5端口已被占用，请重新设置",
+    "The HTTP port is in use. Click OK to modify it.": "HTTP端口已被占用，点击确定前往修改",
+    "The HTTP port is in use. Please reset.": "HTTP端口已被占用，请重新设置",
+    "The RedirectorTCP port is in use. Click OK to modify it.": "RedirectorTCP端口已被占用，点击确定前往修改",
+    "The RedirectorTCP port is in use. Please reset.": "RedirectorTCP端口已被占用，请重新设置",
 
     "Bypass LAN": "[网页代理] 绕过局域网",
     "Bypass LAN (Non System Proxy)": "[网页代理] 绕过局域网（不设置系统代理）",
