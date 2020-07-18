@@ -15,9 +15,13 @@ namespace Netch.Forms
 
     partial class MainForm
     {
-        public void ControlFun()
+        private bool _isFirstCloseWindow = true;
+
+        private void ControlFun()
         {
-            SaveConfigs();
+            //防止模式选择框变成蓝色:D
+            ModeComboBox.Select(0, 0);
+
             if (State == State.Waiting || State == State.Stopped)
             {
                 // 服务器、模式 需选择
@@ -33,36 +37,23 @@ namespace Netch.Forms
                     return;
                 }
 
-                //MenuStrip.Enabled = ConfigurationGroupBox.Enabled = ControlButton.Enabled = SettingsButton.Enabled = false;
-
                 UpdateStatus(State.Starting);
-
-                Firewall.AddNetchFwRules();
 
                 Task.Run(() =>
                 {
+                    Task.Run(Firewall.AddNetchFwRules);
+
                     var server = ServerComboBox.SelectedItem as Models.Server;
                     var mode = ModeComboBox.SelectedItem as Models.Mode;
 
-                    MainController ??= new MainController();
-
-                    var startResult = MainController.Start(server, mode);
-
-                    if (startResult)
+                    if (_mainController.Start(server, mode))
                     {
                         Task.Run(() =>
                         {
-                            UpdateStatus(State.Started);
-                            StatusText(i18N.Translate(StateExtension.GetStatusString(State)) + PortText(server.Type, mode.Type));
+                            UpdateStatus(State.Started,
+                                i18N.Translate(StateExtension.GetStatusString(State.Started)) + PortText(server.Type, mode.Type));
 
-                            LastUploadBandwidth = 0;
-                            //LastDownloadBandwidth = 0;
-                            //UploadSpeedLabel.Text = "↑: 0 KB/s";
-                            DownloadSpeedLabel.Text = "↑↓: 0 KB/s";
-                            UsedBandwidthLabel.Text = $"{i18N.Translate("Used", ": ")}0 KB";
-                            UsedBandwidthLabel.Visible = UploadSpeedLabel.Visible = DownloadSpeedLabel.Visible = true;
-                            UploadSpeedLabel.Visible = false;
-                            Bandwidth.NetTraffic(server, mode, MainController);
+                            Bandwidth.NetTraffic(server, mode, _mainController);
                         });
 
                         // 如果勾选启动后最小化
@@ -71,7 +62,7 @@ namespace Netch.Forms
                             WindowState = FormWindowState.Minimized;
                             NotifyIcon.Visible = true;
 
-                            if (IsFirstOpened)
+                            if (_isFirstCloseWindow)
                             {
                                 // 显示提示语
                                 NotifyIcon.ShowBalloonTip(5,
@@ -80,7 +71,7 @@ namespace Netch.Forms
                                         "Netch is now minimized to the notification bar, double click this icon to restore."),
                                     ToolTipIcon.Info);
 
-                                IsFirstOpened = false;
+                                _isFirstCloseWindow = false;
                             }
 
                             Hide();
@@ -111,8 +102,7 @@ namespace Netch.Forms
                     }
                     else
                     {
-                        UpdateStatus(State.Stopped);
-                        StatusText(i18N.Translate("Start failed"));
+                        UpdateStatus(State.Stopped, i18N.Translate("Start failed"));
                     }
                 });
             }
@@ -120,11 +110,11 @@ namespace Netch.Forms
             {
                 // 停止
                 UpdateStatus(State.Stopping);
-                MainController.Stop();
-                UpdateStatus(State.Stopped);
-
                 Task.Run(() =>
                 {
+                    _mainController.Stop();
+                    UpdateStatus(State.Stopped);
+
                     TestServer();
                 });
             }
@@ -148,7 +138,7 @@ namespace Netch.Forms
                 else
                 {
                     // 不可控HTTP
-                    text.Clear();
+                    return "";
                 }
             }
             else
@@ -163,13 +153,11 @@ namespace Netch.Forms
                         $" | HTTP {i18N.Translate("Local Port", ": ")}{Global.Settings.HTTPLocalPort}");
                 }
             }
-            if (text.Length > 0)
-            {
-                text.Append(")");
-            }
 
+            text.Append(")");
             return text.ToString();
         }
+
 
         public void OnBandwidthUpdated(long download)
         {

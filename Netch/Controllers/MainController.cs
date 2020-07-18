@@ -3,9 +3,6 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using MaxMind.GeoIP2;
-using MaxMind.GeoIP2.Model;
-using Netch.Forms;
 using Netch.Models;
 using Netch.Utils;
 
@@ -20,7 +17,7 @@ namespace Netch.Controllers
         /// <summary>
         ///     NTT 控制器
         /// </summary>
-        public NTTController pNTTController;
+        public NTTController pNTTController = new NTTController();
 
         [DllImport("dnsapi", EntryPoint = "DnsFlushResolverCache")]
         public static extern uint FlushDNSResolverCache();
@@ -33,7 +30,6 @@ namespace Netch.Controllers
         /// <returns>是否启动成功</returns>
         public bool Start(Server server, Mode mode)
         {
-            pNTTController ??= new NTTController();
             FlushDNSResolverCache();
 
             var result = false;
@@ -59,13 +55,34 @@ namespace Netch.Controllers
                         break;
                 }
 
-                MainForm.Instance.StatusText(i18N.Translate("Starting ", pEncryptedProxyController.AkaName));
-                if (pEncryptedProxyController.Ready) result = pEncryptedProxyController.Start(server, mode);
+                KillProcessByName(pEncryptedProxyController.MainFile);
+
+                // 检查端口是否被占用
+                if (PortHelper.PortInUse(Global.Settings.Socks5LocalPort))
+                {
+                    MessageBoxX.Show("Socks5" + i18N.Translate("port is in use."));
+                    return false;
+                }
+
+                if (PortHelper.PortInUse(Global.Settings.HTTPLocalPort))
+                {
+                    MessageBoxX.Show("HTTP" + i18N.Translate("port is in use."));
+                    return false;
+                }
+
+                if (PortHelper.PortInUse(Global.Settings.RedirectorTCPPort, PortType.TCP))
+                {
+                    MessageBoxX.Show("RedirectorTCP"+i18N.Translate("port is in use."));
+                    return false;
+                }
+
+                Global.MainForm.StatusText(i18N.Translate("Starting ", pEncryptedProxyController.Name));
+                result = pEncryptedProxyController.Start(server, mode);
             }
 
             if (result)
             {
-                // 加密代理已启动
+                Logging.Info("加密代理已启动");
                 switch (mode.Type)
                 {
                     case 0: // 进程代理模式
@@ -84,28 +101,30 @@ namespace Netch.Controllers
                         break;
                 }
 
-                if (pModeController != null && pModeController.Ready)
+                if (pModeController != null)
                 {
-                    MainForm.Instance.StatusText(i18N.Translate("Starting ", pModeController.AkaName));
+                    Global.MainForm.StatusText(i18N.Translate("Starting ", pModeController.Name));
                     result = pModeController.Start(server, mode);
                 }
 
-                switch (mode.Type)
+                if (result)
                 {
-                    case 0:
-                    case 1:
-                    case 2:
-                        if (result)
+                    switch (mode.Type)
+                    {
+                        case 0:
+                        case 1:
+                        case 2:
                             Task.Run(() =>
                             {
-                                MainForm.Instance.NatTypeStatusText(i18N.Translate("Starting NatTester"));
+                                Global.MainForm.NatTypeStatusText(i18N.Translate("Starting NatTester"));
                                 // Thread.Sleep(1000);
                                 var (nttResult, natType, localEnd, publicEnd) = pNTTController.Start();
                                 var country = Utils.Utils.GetCityCode(publicEnd);
 
-                                if (nttResult) MainForm.Instance.NatTypeStatusText(natType, country);
+                                if (nttResult) Global.MainForm.NatTypeStatusText(natType, country);
                             });
-                        break;
+                            break;
+                    }
                 }
             }
 

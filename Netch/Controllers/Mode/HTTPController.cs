@@ -19,8 +19,7 @@ namespace Netch.Controllers
 
         public HTTPController()
         {
-            AkaName = "HTTP";
-            Ready = true;
+            Name = "HTTP";
         }
 
         /// <summary>
@@ -31,8 +30,6 @@ namespace Netch.Controllers
         /// <returns>是否启动成功</returns>
         public override bool Start(Server server, Mode mode)
         {
-            if (!Ready) return false;
-
             RecordPrevious();
             try
             {

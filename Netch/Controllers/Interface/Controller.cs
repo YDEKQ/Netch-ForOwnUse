@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using Netch.Models;
@@ -10,15 +11,8 @@ namespace Netch.Controllers
     {
         /// <summary>
         ///     控制器名
-        ///     <param />
-        ///     未赋值会在 <see cref="InitCheck" /> 赋值为 <see cref="MainFile" />
         /// </summary>
-        public string AkaName;
-
-        /// <summary>
-        ///     其他需要文件
-        /// </summary>
-        protected string[] ExtFiles;
+        public string Name;
 
         /// <summary>
         ///     进程实例
@@ -30,10 +24,29 @@ namespace Netch.Controllers
         /// </summary>
         public string MainFile;
 
-        /// <summary>
-        ///     运行检查, 由 <see cref="InitCheck()" />  赋值
-        /// </summary>
-        public bool Ready;
+        private List<string> _startedKeywords = new List<string>();
+
+        private List<string> _stoppedKeywords = new List<string>();
+
+        protected bool RedirectStd = true;
+
+        protected void StartedKeywords(params string[] texts)
+        {
+            foreach (var text in texts)
+            {
+                _startedKeywords.Add(text);
+            }
+        }
+
+
+        protected void StoppedKeywords(params string[] texts)
+        {
+            foreach (var text in texts)
+            {
+                _stoppedKeywords.Add(text);
+            }
+        }
+
 
         /// <summary>
         ///     当前状态
@@ -55,96 +68,120 @@ namespace Netch.Controllers
             }
             catch (Exception e)
             {
-                Logging.Error($"停止 {MainFile}.exe 错误：\n" + e);
+                Logging.Error($"停止 {MainFile} 错误：\n" + e);
             }
         }
 
 
-        /// <summary>
-        ///     杀残留进程，清除日志，检查文件
-        /// </summary>
-        /// <returns></returns>
-        protected void InitCheck()
+        public void ClearLog()
         {
-            if (string.IsNullOrEmpty(AkaName)) AkaName = MainFile;
-
-            var result = false;
-            // 杀残留
-            MainController.KillProcessByName(MainFile);
-            // 清日志
             try
             {
-                if (File.Exists($"logging\\{AkaName}.log")) File.Delete($"logging\\{AkaName}.log");
+                if (File.Exists($"logging\\{Name}.log")) File.Delete($"logging\\{Name}.log");
             }
             catch (Exception)
             {
                 // ignored
             }
-
-            // 检查文件
-            var mainResult = true;
-            var extResult = true;
-            if (!string.IsNullOrEmpty(MainFile) && !File.Exists($"bin\\{MainFile}.exe"))
-            {
-                mainResult = false;
-                Logging.Error($"主程序 bin\\{MainFile}.exe 不存在");
-            }
-
-            if (ExtFiles == null)
-                extResult = true;
-            else
-                foreach (var f in ExtFiles)
-                    if (!File.Exists($"bin\\{f}"))
-                    {
-                        extResult = false;
-                        Logging.Error($"附加文件 bin\\{f} 不存在");
-                    }
-
-            result = extResult && mainResult;
-            if (!result)
-                Logging.Error(AkaName + " 未就绪");
-            Ready = result;
         }
 
         /// <summary>
         ///     写日志
         /// </summary>
-        /// <param name="std"></param>
-        /// <returns><see cref="std" />是否为空</returns>
-        protected bool WriteLog(DataReceivedEventArgs std)
+        /// <param name="s"></param>
+        /// <returns><see cref="s" />是否为空</returns>
+        protected bool Write(string s)
         {
-            if (string.IsNullOrWhiteSpace(std.Data)) return false;
+            if (string.IsNullOrWhiteSpace(s)) return false;
             try
-
             {
-                File.AppendAllText($"logging\\{AkaName}.log", $@"{std.Data}{Global.EOF}");
+                File.AppendAllText($"logging\\{Name}.log", s + Global.EOF);
             }
             catch (Exception e)
             {
-                Logging.Error($"写入{AkaName}日志错误：\n" + e);
+                Logging.Error($"写入{Name}日志错误：\n" + e);
             }
 
             return true;
         }
 
-        public static Process GetProcess(string path = null, bool redirectStd = true)
+        public Process GetProcess()
         {
             var p = new Process
             {
                 StartInfo =
                 {
-                    Arguments = "",
+                    FileName = Path.GetFullPath($"bin\\{MainFile}"),
                     WorkingDirectory = $"{Global.NetchDir}\\bin",
                     CreateNoWindow = true,
-                    RedirectStandardError = redirectStd,
-                    RedirectStandardInput = redirectStd,
-                    RedirectStandardOutput = redirectStd,
+                    RedirectStandardError = RedirectStd,
+                    RedirectStandardInput = RedirectStd,
+                    RedirectStandardOutput = RedirectStd,
                     UseShellExecute = false
                 },
                 EnableRaisingEvents = true
             };
-            if (path != null) p.StartInfo.FileName = Path.GetFullPath(path);
             return p;
+        }
+        public Process GetProcess(string filename)
+        {
+            var p = new Process
+            {
+                StartInfo =
+                {
+                    FileName = Path.GetFullPath($"bin\\{filename}"),
+                    WorkingDirectory = $"{Global.NetchDir}\\bin",
+                    CreateNoWindow = true,
+                    RedirectStandardError = RedirectStd,
+                    RedirectStandardInput = RedirectStd,
+                    RedirectStandardOutput = RedirectStd,
+                    UseShellExecute = false
+                },
+                EnableRaisingEvents = true
+            };
+            return p;
+        }
+
+        /// <summary>
+        ///     接收输出数据
+        /// </summary>
+        /// <param name="sender">发送者</param>
+        /// <param name="e">数据</param>
+        protected void OnOutputDataReceived(object sender, DataReceivedEventArgs e)
+        {
+            // 写入日志
+            if (!Write(e.Data)) return;
+
+            // 检查启动
+            if (State == State.Starting)
+            {
+                if (Instance.HasExited)
+                {
+                    State = State.Stopped;
+
+                    return;
+                }
+
+                foreach (var s in _startedKeywords)
+                {
+                    if (e.Data.Contains(s))
+                    {
+                        State = State.Started;
+
+                        return;
+                    }
+                }
+
+                foreach (var s in _stoppedKeywords)
+                {
+                    if (e.Data.Contains(s))
+                    {
+                        State = State.Stopped;
+
+                        return;
+                    }
+                }
+            }
         }
     }
 }

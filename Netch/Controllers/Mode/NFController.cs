@@ -16,18 +16,12 @@ namespace Netch.Controllers
     {
         private static readonly ServiceController NFService = new ServiceController("netfilter2");
 
-        private static readonly string BinDriver = "";
+        private static readonly string BinDriver = string.Empty;
         private static readonly string SystemDriver = $"{Environment.SystemDirectory}\\drivers\\netfilter2.sys";
 
-        public static string DriverVersion(string file)
-        {
-            return File.Exists(file) ? FileVersionInfo.GetVersionInfo(file).FileVersion : "";
-        }
         static NFController()
         {
-            // 生成系统版本
-            var winNTver = $"{Environment.OSVersion.Version.Major.ToString()}.{Environment.OSVersion.Version.Minor.ToString()}";
-            switch (winNTver)
+            switch ($"{Environment.OSVersion.Version.Major}.{Environment.OSVersion.Version.Minor}")
             {
                 case "10.0":
                     BinDriver = "Win-10.sys";
@@ -41,7 +35,7 @@ namespace Netch.Controllers
                     BinDriver = "Win-7.sys";
                     break;
                 default:
-                    Logging.Error($"不支持的系统版本：{winNTver}");
+                    Logging.Error($"不支持的系统版本：{Environment.OSVersion.Version}");
                     return;
             }
 
@@ -50,22 +44,24 @@ namespace Netch.Controllers
 
         public NFController()
         {
-            MainFile = "Redirector";
-            ExtFiles = new[] { Path.GetFileName(BinDriver) };
-            InitCheck();
-
-            if (!File.Exists(SystemDriver))
-            {
-                InstallDriver();
-            }
+            Name = "Redirector";
+            MainFile = "Redirector.exe";
+            StartedKeywords("Started");
+            StoppedKeywords("Failed", "Unable");
         }
 
         /*public override bool Start(Server server, Mode mode)
         {
-            if (!CheckDriverReady())
+            Logging.Info("内置驱动版本" + DriverVersion(BinDriver));
+            Logging.Info("系统驱动版本" + DriverVersion(SystemDriver));
+            if (DriverVersion(SystemDriver) != DriverVersion(BinDriver))
             {
                 if (File.Exists(SystemDriver))
+                {
+                    Logging.Info("更新驱动");
                     UninstallDriver();
+                }
+
                 if (!InstallDriver())
                     return false;
             }
@@ -75,7 +71,7 @@ namespace Netch.Controllers
                 processList += proc + ",";
             processList += "NTT.exe";
 
-            Instance = GetProcess("bin\\Redirector.exe");
+            Instance = GetProcess();
             if (server.Type != "Socks5")
             {
                 Instance.StartInfo.Arguments += $"-r 127.0.0.1:{Global.Settings.Socks5LocalPort} -p \"{processList}\"";
@@ -112,7 +108,7 @@ namespace Netch.Controllers
                     if (State == State.Started) return true;
                 }
 
-                Logging.Error("NF 进程启动超时");
+                Logging.Error(Name + "启动超时");
                 Stop();
                 if (!RestartService()) return false;
             }
@@ -120,14 +116,131 @@ namespace Netch.Controllers
             return false;
         }*/
 
+        private bool RestartService()
+        {
+            try
+            {
+                switch (NFService.Status)
+                {
+                    // 启动驱动服务
+                    case ServiceControllerStatus.Running:
+                        // 防止其他程序占用 重置 NF 百万连接数限制
+                        NFService.Stop();
+                        NFService.WaitForStatus(ServiceControllerStatus.Stopped);
+                        Global.MainForm.StatusText(i18N.Translate("Starting netfilter2 Service"));
+                        NFService.Start();
+                        break;
+                    case ServiceControllerStatus.Stopped:
+                        Global.MainForm.StatusText(i18N.Translate("Starting netfilter2 Service"));
+                        NFService.Start();
+                        break;
+                }
+            }
+            catch (Exception e)
+            {
+                Logging.Error("启动驱动服务失败：\n" + e);
+
+                var result = NFAPI.nf_registerDriver("netfilter2");
+                if (result != NF_STATUS.NF_STATUS_SUCCESS)
+                {
+                    Logging.Error($"注册驱动失败，返回值：{result}");
+                    return false;
+                }
+
+                Logging.Info("注册驱动成功");
+            }
+
+            return true;
+        }
+
+        public static string DriverVersion(string file)
+        {
+            return File.Exists(file) ? FileVersionInfo.GetVersionInfo(file).FileVersion : string.Empty;
+        }
+
+        /// <summary>
+        ///     卸载 NF 驱动
+        /// </summary>
+        /// <returns>是否成功卸载</returns>
+        public static bool UninstallDriver()
+        {
+            Global.MainForm.StatusText("Uninstall netfilter2");
+            Logging.Info("卸载NF驱动");
+            try
+            {
+                if (NFService.Status == ServiceControllerStatus.Running)
+                {
+                    NFService.Stop();
+                    NFService.WaitForStatus(ServiceControllerStatus.Stopped);
+                }
+            }
+            catch (Exception)
+            {
+                // ignored
+            }
+
+            if (!File.Exists(SystemDriver)) return true;
+
+            try
+            {
+                NFAPI.nf_unRegisterDriver("netfilter2");
+            }
+            catch (Exception e)
+            {
+                Logging.Error(e.ToString());
+                return false;
+            }
+
+            File.Delete(SystemDriver);
+            return true;
+        }
+
+        /// <summary>
+        ///     安装 NF 驱动
+        /// </summary>
+        /// <returns>驱动是否安装成功</returns>
+        public static bool InstallDriver()
+        {
+            Logging.Info("安装NF驱动");
+            try
+            {
+                File.Copy(BinDriver, SystemDriver);
+            }
+            catch (Exception e)
+            {
+                Logging.Error("驱动复制失败\n" + e);
+                return false;
+            }
+
+            Global.MainForm.StatusText(i18N.Translate("Register driver"));
+            // 注册驱动文件
+            var result = NFAPI.nf_registerDriver("netfilter2");
+            if (result == NF_STATUS.NF_STATUS_SUCCESS)
+            {
+                Logging.Info($"驱动安装成功，当前驱动版本:{DriverVersion(SystemDriver)}");
+            }
+            else
+            {
+                Logging.Error($"注册驱动失败，返回值：{result}");
+                return false;
+            }
+
+            return true;
+        }
 
         private static string[] _sysDns = { };
         public override bool Start(Server server, Mode mode)
         {
-            if (!CheckDriverReady())
+            Logging.Info("内置驱动版本" + DriverVersion(BinDriver));
+            Logging.Info("系统驱动版本" + DriverVersion(SystemDriver));
+            if (DriverVersion(SystemDriver) != DriverVersion(BinDriver))
             {
                 if (File.Exists(SystemDriver))
+                {
+                    Logging.Info("更新驱动");
                     UninstallDriver();
+                }
+
                 if (!InstallDriver())
                     return false;
             }
@@ -160,15 +273,8 @@ namespace Netch.Controllers
             }
             processes = processes.Substring(0, processes.Length - 1);
 
-            Instance = GetProcess("bin\\Redirector.exe");
+            Instance = GetProcess();
             var fallback = "";
-
-
-            if (!File.Exists("bin\\Redirector.exe"))
-            {
-                return false;
-            }
-            Instance.StartInfo.FileName = "bin\\Redirector.exe";
 
             if (server.Type != "Socks5")
             {
@@ -310,139 +416,6 @@ namespace Netch.Controllers
             Stop();
             return false;
         }
-        private bool RestartService()
-        {
-            try
-            {
-                switch (NFService.Status)
-                {
-                    // 启动驱动服务
-                    case ServiceControllerStatus.Running:
-                        // 防止其他程序占用 重置 NF 百万连接数限制
-                        NFService.Stop();
-                        NFService.WaitForStatus(ServiceControllerStatus.Stopped);
-                        MainForm.Instance.StatusText(i18N.Translate("Starting netfilter2 Service"));
-                        NFService.Start();
-                        break;
-                    case ServiceControllerStatus.Stopped:
-                        MainForm.Instance.StatusText(i18N.Translate("Starting netfilter2 Service"));
-                        NFService.Start();
-                        break;
-                }
-            }
-            catch (Exception e)
-            {
-                Logging.Error("启动驱动服务失败：\n" + e);
-
-                var result = NFAPI.nf_registerDriver("netfilter2");
-                if (result != NF_STATUS.NF_STATUS_SUCCESS)
-                {
-                    Logging.Error($"注册驱动失败，返回值：{result}");
-                    return false;
-                }
-
-                Logging.Info("注册驱动成功");
-            }
-
-            return true;
-        }
-
-        private bool CheckDriverReady()
-        {
-            // 检查驱动是否存在
-            if (!File.Exists(SystemDriver)) return false;
-
-            // 检查驱动版本号
-            return DriverVersion(SystemDriver) == DriverVersion(BinDriver);
-        }
-
-        public static bool UninstallDriver()
-        {
-            try
-            {
-                if (NFService.Status == ServiceControllerStatus.Running)
-                {
-                    NFService.Stop();
-                    NFService.WaitForStatus(ServiceControllerStatus.Stopped);
-                }
-            }
-            catch (Exception)
-            {
-                // ignored
-            }
-
-            if (!File.Exists(SystemDriver)) return true;
-            try
-            {
-                NFAPI.nf_unRegisterDriver("netfilter2");
-
-                File.Delete(SystemDriver);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
-        }
-
-        public static bool InstallDriver()
-        {
-            Logging.Info("安装驱动中");
-            try
-            {
-                File.Copy(BinDriver, SystemDriver);
-            }
-            catch (Exception e)
-            {
-                Logging.Error("驱动复制失败\n" + e);
-                return false;
-            }
-
-            MainForm.Instance.StatusText(i18N.Translate("Register driver"));
-            // 注册驱动文件
-            var result = NFAPI.nf_registerDriver("netfilter2");
-            if (result == NF_STATUS.NF_STATUS_SUCCESS)
-            {
-                Logging.Info($"驱动安装成功，当前驱动版本:{DriverVersion(DriverVersion(SystemDriver))}");
-            }
-            else
-            {
-                Logging.Error($"注册驱动失败，返回值：{result}");
-                return false;
-            }
-
-            return true;
-        }
-
-        private void OnOutputDataReceived(object sender, DataReceivedEventArgs e)
-        {
-            if (!WriteLog(e)) return;
-            if (State == State.Starting)
-            {
-                if (Instance.HasExited)
-                    State = State.Stopped;
-                else if (e.Data.Contains("Started"))
-                    State = State.Started;
-                else if (e.Data.Contains("Failed") || e.Data.Contains("Unable")) State = State.Stopped;
-            }
-            else if (State == State.Started)
-            {
-                if (e.Data.StartsWith("[APP][Bandwidth]"))
-                {
-                    var splited = e.Data.Replace("[APP][Bandwidth]", "").Trim().Split(',');
-                    if (splited.Length == 2)
-                    {
-                        var uploadSplited = splited[0].Split(':');
-                        var downloadSplited = splited[1].Split(':');
-
-                        if (uploadSplited.Length == 2 && downloadSplited.Length == 2)
-                            if (long.TryParse(uploadSplited[1], out var upload) && long.TryParse(downloadSplited[1], out var download))
-                                Task.Run(() => OnBandwidthUpdated(upload, download));
-                    }
-                }
-            }
-        }
-
         public override void Stop()
         {
             StopInstance();
@@ -502,13 +475,13 @@ namespace Netch.Controllers
                         //启动UDP分流服务支持SS/SSR/Trojan
                         if (UDPServer.Type == "SS")
                         {
-                            UDPServerInstance = GetProcess("bin\\Shadowsocks.exe");
+                            UDPServerInstance = GetProcess("Shadowsocks.exe");
                             UDPServerInstance.StartInfo.Arguments = $"-s {UDPServerHostName} -p {UDPServer.Port} -b {Global.Settings.LocalAddress} -l {Global.Settings.Socks5LocalPort + 1} -m {UDPServer.EncryptMethod} -k \"{UDPServer.Password}\" -u";
                         }
 
                         if (UDPServer.Type == "SSR")
                         {
-                            UDPServerInstance = GetProcess("bin\\ShadowsocksR.exe");
+                            UDPServerInstance = GetProcess("ShadowsocksR.exe");
                             UDPServerInstance.StartInfo.Arguments = $"-s {UDPServerHostName} -p {UDPServer.Port} -k \"{UDPServer.Password}\" -m {UDPServer.EncryptMethod} -t 120";
 
                             if (!string.IsNullOrEmpty(UDPServer.Protocol))
@@ -550,7 +523,7 @@ namespace Netch.Controllers
                                     }
                             }));
 
-                            UDPServerInstance = GetProcess("bin\\Trojan.exe");
+                            UDPServerInstance = GetProcess("Trojan.exe");
                             UDPServerInstance.StartInfo.Arguments = "-c ..\\data\\UDPServerlast.json";
 
                         }

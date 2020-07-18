@@ -570,7 +570,7 @@ namespace Netch.Forms
             // blankToolStripStatusLabel
             // 
             this.blankToolStripStatusLabel.Name = "blankToolStripStatusLabel";
-            this.blankToolStripStatusLabel.Size = new System.Drawing.Size(487, 17);
+            this.blankToolStripStatusLabel.Size = new System.Drawing.Size(268, 17);
             this.blankToolStripStatusLabel.Spring = true;
             // 
             // NatTypeStatusLabel
