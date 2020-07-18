@@ -60,8 +60,11 @@ namespace Netch.Utils
             ManagementBaseObject outPar = null;
             foreach (ManagementObject mo in moc)
             {
-                //如果没有启用IP设置的网络设备则跳过
-                if (!(bool) mo["IPEnabled"])
+                //如果没有启用IP设置的网络设备则跳过，如果是虚拟机网卡也跳过
+                if (!(bool) mo["IPEnabled"] || 
+                    mo["Description"].ToString().Contains("Virtual") ||
+                    mo["Description"].ToString().Contains("VMware") ||
+                    mo["Description"].ToString().Contains("TAP"))
                     continue;
 
                 //设置DNS地址
@@ -81,6 +84,8 @@ namespace Netch.Utils
             var systemDns = new[] {"223.5.5.5", "1.1.1.1"};
             foreach (var network in NetworkInterface.GetAllNetworkInterfaces())
                 if (!network.Description.Contains("Virtual") &&
+                    !network.Description.Contains("VMware") &&
+                    !network.Description.Contains("TAP") &&
                     network.OperationalStatus == OperationalStatus.Up &&
                     network.GetIPProperties()?.GatewayAddresses.Count != 0)
                 {
