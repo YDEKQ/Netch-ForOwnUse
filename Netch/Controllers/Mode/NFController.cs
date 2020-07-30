@@ -2,10 +2,11 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.ServiceProcess;
 using System.Threading;
 using System.Threading.Tasks;
-using Netch.Forms;
 using Netch.Models;
 using Netch.Utils;
 using nfapinet;
@@ -16,13 +17,9 @@ namespace Netch.Controllers
     {
         private static readonly ServiceController NFService = new ServiceController("netfilter2");
 
-        private static readonly string BinDriver = "";
+        private static readonly string BinDriver = string.Empty;
         private static readonly string SystemDriver = $"{Environment.SystemDirectory}\\drivers\\netfilter2.sys";
-
-        public static string DriverVersion(string file)
-        {
-            return File.Exists(file) ? FileVersionInfo.GetVersionInfo(file).FileVersion : "";
-        }
+        private static string[] _sysDns = { };
 
         static NFController()
         {
@@ -49,22 +46,25 @@ namespace Netch.Controllers
 
         public NFController()
         {
-            MainFile = "Redirector";
-            ExtFiles = new[] {Path.GetFileName(BinDriver)};
-            InitCheck();
-
-            if (!File.Exists(SystemDriver))
-            {
-                InstallDriver();
-            }
+            Name = "Redirector";
+            MainFile = "Redirector.exe";
+            StartedKeywords("Redirect TCP to");
+            StoppedKeywords("Failed", "Unable");
         }
 
-        /*public override bool Start(Server server, Mode mode)
+        /*
+        public override bool Start(Server server, Mode mode)
         {
-            if (!CheckDriverReady())
+            Logging.Info("内置驱动版本: " + DriverVersion(BinDriver));
+            if (DriverVersion(SystemDriver) != DriverVersion(BinDriver))
             {
                 if (File.Exists(SystemDriver))
+                {
+                    Logging.Info("系统驱动版本: " + DriverVersion(SystemDriver));
+                    Logging.Info("更新驱动");
                     UninstallDriver();
+                }
+
                 if (!InstallDriver())
                     return false;
             }
@@ -74,7 +74,7 @@ namespace Netch.Controllers
                 processList += proc + ",";
             processList += "NTT.exe";
 
-            Instance = GetProcess("bin\\Redirector.exe");
+            Instance = GetProcess();
             if (server.Type != "Socks5")
             {
                 Instance.StartInfo.Arguments += $"-r 127.0.0.1:{Global.Settings.Socks5LocalPort} -p \"{processList}\"";
@@ -108,25 +108,41 @@ namespace Netch.Controllers
                 {
                     Thread.Sleep(250);
 
-                    if (State == State.Started) return true;
+                    if (State == State.Started)
+                    {
+                        if (Global.Settings.ModifySystemDNS)
+                        {
+                            //备份并替换系统DNS
+                            _sysDns = DNS.getSystemDns();
+                            string[] dns = {"1.1.1.1", "8.8.8.8"};
+                            DNS.SetDNS(dns);
+                        }
+
+                        return true;
+                    }
                 }
 
-                Logging.Error("NF 进程启动超时");
+                Logging.Error(Name + " 启动超时");
                 Stop();
                 if (!RestartService()) return false;
             }
 
             return false;
-        }*/
+        }
+        */
 
-
-        private static string[] _sysDns = { };
         public override bool Start(Server server, Mode mode)
         {
-            if (!CheckDriverReady())
+            Logging.Info("内置驱动版本: " + DriverVersion(BinDriver));
+            if (DriverVersion(SystemDriver) != DriverVersion(BinDriver))
             {
                 if (File.Exists(SystemDriver))
+                {
+                    Logging.Info("系统驱动版本: " + DriverVersion(SystemDriver));
+                    Logging.Info("更新驱动");
                     UninstallDriver();
+                }
+
                 if (!InstallDriver())
                     return false;
             }
@@ -138,177 +154,128 @@ namespace Netch.Controllers
 
             //开启进程白名单模式
             if (!Global.Settings.ProcessWhitelistMode)
-            {
                 processes += "NTT.exe,";
-            }
 
             foreach (var proc in mode.Rule)
             {
                 //添加进程代理
                 if (proc.EndsWith(".exe"))
-                {
-                    processes += proc;
-                    processes += ",";
-                }
+                    processes += proc + ",";
                 else
-                {
                     //添加IP过滤器
-                    processesIPFillter += proc;
-                    processesIPFillter += ",";
-                }
+                    processesIPFillter += proc + ",";
             }
-            processes = processes.Substring(0, processes.Length - 1);
 
-            Instance = GetProcess("bin\\Redirector.exe");
-            var fallback = "";
-
-
-            if (!File.Exists("bin\\Redirector.exe"))
-            {
-                return false;
-            }
-            Instance.StartInfo.FileName = "bin\\Redirector.exe";
+            var argStr = "";
 
             if (server.Type != "Socks5")
             {
-                fallback += $"-rtcp 127.0.0.1:{Global.Settings.Socks5LocalPort}";
-
-                fallback = StartUDPServer(fallback);
+                argStr += $"-rtcp 127.0.0.1:{Global.Settings.Socks5LocalPort}";
+                if (!StartUDPServerAndAppendToArgument(ref argStr))
+                    return false;
             }
             else
             {
                 var result = DNS.Lookup(server.Hostname);
                 if (result == null)
                 {
-                    Logging.Info("无法解析服务器 IP 地址");
+                    Logging.Error("无法解析服务器 IP 地址");
                     return false;
                 }
 
-                fallback += $"-rtcp {result}:{server.Port}";
+                argStr += $"-rtcp {result}:{server.Port}";
 
                 if (!string.IsNullOrWhiteSpace(server.Username) && !string.IsNullOrWhiteSpace(server.Password))
-                {
-                    fallback += $" -username \"{server.Username}\" -password \"{server.Password}\"";
-                }
+                    argStr += $" -username \"{server.Username}\" -password \"{server.Password}\"";
 
                 if (Global.Settings.UDPServer)
                 {
                     if (Global.Settings.UDPServerIndex == -1)
                     {
-                        fallback += $" -rudp {result}:{server.Port}";
+                        argStr += $" -rudp {result}:{server.Port}";
                     }
                     else
                     {
-                        fallback = StartUDPServer(fallback);
+                        if (!StartUDPServerAndAppendToArgument(ref argStr))
+                            return false;
                     }
                 }
                 else
                 {
-                    fallback += $" -rudp {result}:{server.Port}";
+                    argStr += $" -rudp {result}:{server.Port}";
                 }
             }
 
             //开启进程白名单模式
+            argStr += $" -bypass {Global.Settings.ProcessWhitelistMode.ToString().ToLower()}";
             if (Global.Settings.ProcessWhitelistMode)
-            {
-                processes += ",ck-client.exe,Privoxy.exe,Redirector.exe,Shadowsocks.exe,ShadowsocksR.exe,simple-obfs.exe,Trojan.exe,tun2socks.exe,unbound.exe,v2ctl.exe,v2ray-plugin.exe,v2ray.exe,wv2ray.exe,tapinstall.exe,Netch.exe";
-                fallback += " -bypass true ";
-            }
-            else
-            {
-                fallback += " -bypass false";
-            }
-
-            fallback += $" -p \"{processes}\"";
+                processes += Firewall.ProgramPath.Aggregate(string.Empty, (current, file) => current + Path.GetFileName(file) + ",");
+            
+            if (processes.EndsWith(","))
+                processes = processes.Substring(0,processes.Length - 1);
+            argStr += $" -p \"{processes}\"";
 
             // true  除规则内IP全走代理
             // false 仅代理规则内IP
-            if (processesIPFillter.Length > 0)
+            if (processesIPFillter.EndsWith(","))
             {
-                if (mode.ProcesssIPFillter())
-                {
-                    fallback += $" -bypassip true";
-                }
-                else
-                {
-                    fallback += $" -bypassip false";
-                }
-                fallback += $" -fip \"{processesIPFillter}\"";
+                processesIPFillter = processesIPFillter.Substring(0,processesIPFillter.Length - 1);
+                argStr += $" -bypassip {mode.ProcesssIPFillter.ToString().ToLower()}";
+                argStr += $" -fip \"{processesIPFillter}\"";
             }
             else
             {
-                fallback += $" -bypassip true";
+                argStr += " -bypassip true";
             }
 
             //进程模式代理IP日志打印
-            if (Global.Settings.ProcessProxyIPLog)
-            {
-                fallback += " -printProxyIP true";
-            }
-            else
-            {
-                fallback += " -printProxyIP false";
-            }
+            argStr += $" -printProxyIP {Global.Settings.ProcessProxyIPLog.ToString().ToLower()}";
 
-            if (!Global.Settings.ProcessNoProxyForUdp)
+            //开启进程UDP代理
+            argStr += $" -udpEnable {(!Global.Settings.ProcessNoProxyForUdp).ToString().ToLower()}";
+
+            argStr += " -dlog";
+
+            Logging.Info($"Redirector : {argStr}");
+
+            Instance = GetProcess();
+            Instance.StartInfo.Arguments = argStr;
+            Instance.OutputDataReceived += OnOutputDataReceived;
+            Instance.ErrorDataReceived += OnOutputDataReceived;
+
+            for (var i = 0; i < 2; i++)
             {
-                //开启进程UDP代理
-                fallback += " -udpEnable true";
-            }
-            else
-            {
-                fallback += " -udpEnable false";
-            }
+                State = State.Starting;
+                Instance.Start();
+                Instance.BeginOutputReadLine();
+                Instance.BeginErrorReadLine();
 
-            Logging.Info($"Redirector : {fallback}");
-
-            if (File.Exists("logging\\redirector.log"))
-                File.Delete("logging\\redirector.log");
-
-            Instance.StartInfo.Arguments = fallback;
-            State = Models.State.Starting;
-            Instance.Start();
-            Instance.BeginOutputReadLine();
-            Instance.BeginErrorReadLine();
-
-            for (var i = 0; i < 1000; i++)
-            {
-                try
+                for (var j = 0; j < 40; j++)
                 {
-                    if (File.Exists("logging\\redirector.log"))
+                    Thread.Sleep(250);
+
+                    if (State == State.Started)
                     {
-                        FileStream fs = new FileStream("logging\\redirector.log", FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                        StreamReader sr = new StreamReader(fs, System.Text.Encoding.Default);
-
-                        if (sr.ReadToEnd().Contains("Redirect TCP to"))
+                        if (Global.Settings.ModifySystemDNS)
                         {
-
-                            State = State.Started;
-
                             //备份并替换系统DNS
                             _sysDns = DNS.getSystemDns();
-                            string[] dns = { "1.1.1.1", "8.8.8.8" };
+                            string[] dns = {"1.1.1.1", "8.8.8.8"};
                             DNS.SetDNS(dns);
-
-                            return true;
                         }
+
+                        return true;
                     }
                 }
-                catch (Exception e)
-                {
-                    Logging.Error(e.Message);
-                    return true;
-                }
-                finally
-                {
-                    Thread.Sleep(10);
-                }
+
+                Logging.Error(Name + " 启动超时");
+                Stop();
+                if (!RestartService()) return false;
             }
 
-            Logging.Info("NF 进程启动超时");
-            Stop();
             return false;
         }
+
         private bool RestartService()
         {
             try
@@ -346,17 +313,19 @@ namespace Netch.Controllers
             return true;
         }
 
-        private bool CheckDriverReady()
+        public static string DriverVersion(string file)
         {
-            // 检查驱动是否存在
-            if (!File.Exists(SystemDriver)) return false;
-
-            // 检查驱动版本号
-            return DriverVersion(SystemDriver) == DriverVersion(BinDriver);
+            return File.Exists(file) ? FileVersionInfo.GetVersionInfo(file).FileVersion : string.Empty;
         }
 
+        /// <summary>
+        ///     卸载 NF 驱动
+        /// </summary>
+        /// <returns>是否成功卸载</returns>
         public static bool UninstallDriver()
         {
+            Global.MainForm.StatusText(i18N.Translate("Uninstalling NF Service"));
+            Logging.Info("卸载 NF 驱动");
             try
             {
                 if (NFService.Status == ServiceControllerStatus.Running)
@@ -371,22 +340,28 @@ namespace Netch.Controllers
             }
 
             if (!File.Exists(SystemDriver)) return true;
+
             try
             {
                 NFAPI.nf_unRegisterDriver("netfilter2");
-
-                File.Delete(SystemDriver);
-                return true;
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                throw ex;
+                Logging.Error(e.ToString());
+                return false;
             }
+
+            File.Delete(SystemDriver);
+            return true;
         }
 
+        /// <summary>
+        ///     安装 NF 驱动
+        /// </summary>
+        /// <returns>驱动是否安装成功</returns>
         public static bool InstallDriver()
         {
-            Logging.Info("安装驱动中");
+            Logging.Info("安装 NF 驱动");
             try
             {
                 File.Copy(BinDriver, SystemDriver);
@@ -402,7 +377,7 @@ namespace Netch.Controllers
             var result = NFAPI.nf_registerDriver("netfilter2");
             if (result == NF_STATUS.NF_STATUS_SUCCESS)
             {
-                Logging.Info($"驱动安装成功，当前驱动版本:{DriverVersion(SystemDriver)}");
+                Logging.Info($"驱动安装成功");
             }
             else
             {
@@ -413,40 +388,44 @@ namespace Netch.Controllers
             return true;
         }
 
-        private void OnOutputDataReceived(object sender, DataReceivedEventArgs e)
-        {
-            if (!Write(e.Data)) return;
-            if (State == State.Starting)
-            {
-                if (Instance.HasExited)
-                    State = State.Stopped;
-                else if (e.Data.Contains("Started"))
-                    State = State.Started;
-                else if (e.Data.Contains("Failed") || e.Data.Contains("Unable")) State = State.Stopped;
-            }
-            else if (State == State.Started)
-            {
-                if (e.Data.StartsWith("[APP][Bandwidth]"))
-                {
-                    var splited = e.Data.Replace("[APP][Bandwidth]", "").Trim().Split(',');
-                    if (splited.Length == 2)
-                    {
-                        var uploadSplited = splited[0].Split(':');
-                        var downloadSplited = splited[1].Split(':');
-
-                        if (uploadSplited.Length == 2 && downloadSplited.Length == 2)
-                            if (long.TryParse(uploadSplited[1], out var upload) && long.TryParse(downloadSplited[1], out var download))
-                                Task.Run(() => OnBandwidthUpdated(upload, download));
-                    }
-                }
-            }
-        }
+        // private new void OnOutputDataReceived(object sender, DataReceivedEventArgs e)
+        // {
+        //     if (!Write(e.Data)) return;
+        //     if (State == State.Starting)
+        //     {
+        //         if (Instance.HasExited)
+        //             State = State.Stopped;
+        //         else if (e.Data.Contains("Started"))
+        //             State = State.Started;
+        //         else if (e.Data.Contains("Failed") || e.Data.Contains("Unable")) State = State.Stopped;
+        //     }
+        //     else if (State == State.Started)
+        //     {
+        //         if (e.Data.StartsWith("[APP][Bandwidth]"))
+        //         {
+        //             var splited = e.Data.Replace("[APP][Bandwidth]", "").Trim().Split(',');
+        //             if (splited.Length == 2)
+        //             {
+        //                 var uploadSplited = splited[0].Split(':');
+        //                 var downloadSplited = splited[1].Split(':');
+        //
+        //                 if (uploadSplited.Length == 2 && downloadSplited.Length == 2)
+        //                     if (long.TryParse(uploadSplited[1], out var upload) && long.TryParse(downloadSplited[1], out var download))
+        //                         Task.Run(() => OnBandwidthUpdated(upload, download));
+        //             }
+        //         }
+        //     }
+        // }
 
         public override void Stop()
         {
+            Task.Run(() =>
+            {
+                if (Global.Settings.ModifySystemDNS)
+                    //恢复系统DNS
+                    DNS.SetDNS(_sysDns);
+            });
             StopInstance();
-            //恢复系统DNS
-            DNS.SetDNS(_sysDns);
             try
             {
                 if (UDPServerInstance == null || UDPServerInstance.HasExited) return;
@@ -476,7 +455,7 @@ namespace Netch.Controllers
         /// </summary>
         public Process UDPServerInstance;
 
-        private string StartUDPServer(string fallback)
+        private bool StartUDPServerAndAppendToArgument(ref string fallback)
         {
             if (Global.Settings.UDPServer)
             {
@@ -491,9 +470,10 @@ namespace Netch.Controllers
                     var result = Utils.DNS.Lookup(UDPServer.Hostname);
                     if (result == null)
                     {
-                        Utils.Logging.Info("无法解析服务器 IP 地址");
-                        return "error";
+                        Logging.Error("无法解析服务器 IP 地址");
+                        return false;
                     }
+
                     var UDPServerHostName = result.ToString();
 
                     if (UDPServer.Type != "Socks5")
@@ -536,7 +516,6 @@ namespace Netch.Controllers
 
                         if (UDPServer.Type == "TR")
                         {
-
                             File.WriteAllText("data\\UDPServerlast.json", Newtonsoft.Json.JsonConvert.SerializeObject(new Models.Trojan()
                             {
                                 local_addr = Global.Settings.LocalAddress,
@@ -544,14 +523,13 @@ namespace Netch.Controllers
                                 remote_addr = UDPServerHostName,
                                 remote_port = UDPServer.Port,
                                 password = new List<string>()
-                                    {
-                                      UDPServer.Password
-                                    }
+                                {
+                                    UDPServer.Password
+                                }
                             }));
 
                             UDPServerInstance = GetProcess("bin\\Trojan.exe");
                             UDPServerInstance.StartInfo.Arguments = "-c ..\\data\\UDPServerlast.json";
-
                         }
 
                         Utils.Logging.Info($"UDPServer : {UDPServerInstance.StartInfo.Arguments}");
@@ -588,14 +566,14 @@ namespace Netch.Controllers
                     {
                         fallback += $" -rudp {UDPServerHostName}:{UDPServer.Port}";
                     }
-
                 }
             }
             else
             {
                 fallback += $" -rudp 127.0.0.1:{Global.Settings.Socks5LocalPort}";
             }
-            return fallback;
+
+            return true;
         }
     }
 }

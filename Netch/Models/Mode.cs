@@ -41,11 +41,9 @@ namespace Netch.Models
         ///    true 除规则内IP全走代理 默认
         ///    false 仅代理规则内IP
         /// </summary>
-        public bool ProcesssIPFillter() {
-            if (Remark.Contains("IPFillter=false"))
-                return false;
-            return true;
-        }
+        public bool ProcesssIPFillter => !Remark.Contains("IPFillter=false");
+
+        public bool A { get; set; }
 
         /// <summary>
         ///		获取备注

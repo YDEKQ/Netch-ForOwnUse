@@ -73,6 +73,11 @@ namespace Netch.Forms
             // 加载快速配置
             InitProfile();
 
+            // 打开软件时启动加速，产生开始按钮点击事件
+            if (Global.Settings.StartWhenOpened)
+            {
+                ControlButton.PerformClick();
+            }
 
             // 自动检测延迟
             Task.Run(() =>
@@ -92,17 +97,14 @@ namespace Netch.Forms
                 }
             });
 
-            // 打开软件时启动加速，产生开始按钮点击事件
-            if (Global.Settings.StartWhenOpened)
+            Task.Run(() =>
             {
-                ControlButton.PerformClick();
-            }
-
-            // 检查更新
-            if (Global.Settings.CheckUpdateWhenOpened)
-            {
-                CheckUpdate();
-            }
+                // 检查更新
+                if (Global.Settings.CheckUpdateWhenOpened)
+                {
+                    CheckUpdate();
+                }
+            });
         }
 
 
@@ -118,16 +120,11 @@ namespace Netch.Forms
                 {
                     // 使关闭时窗口向右下角缩小的效果
                     WindowState = FormWindowState.Minimized;
-                    NotifyIcon.Visible = true;
 
                     if (_isFirstCloseWindow)
                     {
                         // 显示提示语
-                        NotifyIcon.ShowBalloonTip(5,
-                            UpdateChecker.Name,
-                            i18N.Translate("Netch is now minimized to the notification bar, double click this icon to restore."),
-                            ToolTipIcon.Info);
-
+                        NotifyTip(i18N.Translate("Netch is now minimized to the notification bar, double click this icon to restore."));
                         _isFirstCloseWindow = false;
                     }
 
@@ -186,7 +183,7 @@ namespace Netch.Forms
             UpdateServersFromSubscribeLinksToolStripMenuItem.Text = i18N.Translate("Update Servers From Subscribe Links");
             OptionsToolStripMenuItem.Text = i18N.Translate("Options");
             ReloadModesToolStripMenuItem.Text = i18N.Translate("Reload Modes");
-            UninstallServiceToolStripMenuItem.Text = i18N.Translate("Uninstall Service");
+            UninstallServiceToolStripMenuItem.Text = i18N.Translate("Uninstall NF Service");
             CleanDNSCacheToolStripMenuItem.Text = i18N.Translate("Clean DNS Cache");
             UpdateACLToolStripMenuItem.Text = i18N.Translate("Update ACL");
             updateACLWithProxyToolStripMenuItem.Text = i18N.Translate("Update ACL with proxy");
@@ -211,9 +208,44 @@ namespace Netch.Forms
             // 加载翻译
 
             UsedBandwidthLabel.Text = $@"{i18N.Translate("Used", ": ")}0 KB";
-            UpdateStatus();
+            State = State;
 
             VersionLabel.Text = @"DM bUg Ver" + UpdateChecker.Version;
+        }
+
+        private void Exit(bool forceExit = false)
+        {
+            if (State != State.Waiting && State != State.Stopped && !Global.Settings.StopWhenExited && !forceExit)
+            {
+                MessageBoxX.Show(i18N.Translate("Please press Stop button first"));
+
+                Visible = true;
+                ShowInTaskbar = true; // 显示在系统任务栏 
+                WindowState = FormWindowState.Normal; // 还原窗体 
+                NotifyIcon.Visible = true; // 托盘图标隐藏 
+                return;
+            }
+
+            Hide();
+            NotifyIcon.Visible = false;
+            if (State != State.Waiting && State != State.Stopped)
+            {
+                // 已启动
+                ControlFun();
+            }
+
+            Task.Run(() =>
+            {
+                for (var i = 0; i < 16; i++)
+                {
+                    if (State == State.Waiting || State == State.Stopped)
+                        break;
+                    Thread.Sleep(250);
+                }
+
+                SaveConfigs();
+                State = State.Terminating;
+            });
         }
 
         #region MISC
@@ -311,7 +343,7 @@ namespace Netch.Forms
             }
             else
             {
-                MessageBoxX.Show(i18N.Translate("Please select an mode first"));
+                MessageBoxX.Show(i18N.Translate("Please select a mode first"));
             }
         }
 
@@ -336,7 +368,7 @@ namespace Netch.Forms
             }
             else
             {
-                MessageBoxX.Show(i18N.Translate("Please select an mode first"));
+                MessageBoxX.Show(i18N.Translate("Please select a mode first"));
             }
         }
 
@@ -385,50 +417,6 @@ namespace Netch.Forms
             }
         }
 
-        private void Exit(bool forceExit = false)
-        {
-            if (IsDisposed) return;
-            // 已启动
-            if (State != State.Waiting && State != State.Stopped)
-            {
-                if (forceExit)
-                    ControlFun();
-                else
-                {
-                    if (!Global.Settings.StopWhenExited)
-                    {
-                        // 未开启自动停止
-                        MessageBoxX.Show(i18N.Translate("Please press Stop button first"));
-
-                        Visible = true;
-                        ShowInTaskbar = true; // 显示在系统任务栏 
-                        WindowState = FormWindowState.Normal; // 还原窗体 
-                        NotifyIcon.Visible = true; // 托盘图标隐藏 
-
-                        return;
-                    }
-                }
-            }
-
-            NotifyIcon.Visible = false;
-            Hide();
-
-            Task.Run(() =>
-            {
-                for (var i = 0; i < 16; i++)
-                {
-                    if (State == State.Waiting || State == State.Stopped)
-                        break;
-                    Thread.Sleep(250);
-                }
-
-                SaveConfigs();
-                UpdateStatus(State.Terminating);
-                Dispose();
-                Environment.Exit(Environment.ExitCode);
-            });
-        }
-
         #region NotifyIcon
 
         private void ShowMainFormToolStripButton_Click(object sender, EventArgs e)
@@ -438,7 +426,6 @@ namespace Netch.Forms
                 Visible = true;
                 ShowInTaskbar = true; // 显示在系统任务栏 
                 WindowState = FormWindowState.Normal; // 还原窗体 
-                NotifyIcon.Visible = true; // 托盘图标隐藏 
             }
 
             Activate();
@@ -460,6 +447,14 @@ namespace Netch.Forms
             }
 
             Activate();
+        }
+
+        private void NotifyTip(string text, int timeout = 5, bool info = true)
+        {
+            NotifyIcon.ShowBalloonTip(timeout,
+                UpdateChecker.Name,
+                text,
+                info ? ToolTipIcon.Info : ToolTipIcon.Error);
         }
 
         #endregion

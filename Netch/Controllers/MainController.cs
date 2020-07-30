@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -11,6 +12,12 @@ namespace Netch.Controllers
 {
     public class MainController
     {
+        /// <summary>
+        ///     记录当前使用的端口
+        ///     <see cref="MainForm.LocalPortText"/>
+        /// </summary>
+        public static readonly List<int> UsingPorts = new List<int>();
+
         public EncryptedProxy pEncryptedProxyController;
 
         public ModeController pModeController;
@@ -31,6 +38,7 @@ namespace Netch.Controllers
         /// <returns>是否启动成功</returns>
         public bool Start(Server server, Mode mode)
         {
+            Logging.Info($"启动主控制器: {server.Type} [{mode.Type}]{mode.Remark}");
             FlushDNSResolverCache();
 
             var result = false;
@@ -56,14 +64,33 @@ namespace Netch.Controllers
                         break;
                 }
 
+                KillProcessByName(pEncryptedProxyController.MainFile);
+
+                // 检查端口是否被占用
+                if (PortHelper.PortInUse(Global.Settings.Socks5LocalPort))
+                {
+                    MessageBoxX.Show(i18N.TranslateFormat("The {0} port is in use.", "Socks5"));
+                    return false;
+                }
+
+                if (PortHelper.PortInUse(Global.Settings.HTTPLocalPort))
+                {
+                    MessageBoxX.Show(i18N.TranslateFormat("The {0} port is in use.", "HTTP"));
+                    return false;
+                }
+
+                if (PortHelper.PortInUse(Global.Settings.RedirectorTCPPort, PortType.TCP))
+                {
+                    MessageBoxX.Show(i18N.TranslateFormat("The {0} port is in use.", "Redirector TCP"));
+                    return false;
+                }
+
                 Global.MainForm.StatusText(i18N.Translate("Starting ", pEncryptedProxyController.Name));
-                if (pEncryptedProxyController.Ready) result = pEncryptedProxyController.Start(server, mode);
+                result = pEncryptedProxyController.Start(server, mode);
             }
 
             if (result)
             {
-                Logging.Info("加密代理已启动");
-                // 加密代理已启动
                 switch (mode.Type)
                 {
                     case 0: // 进程代理模式
@@ -82,7 +109,7 @@ namespace Netch.Controllers
                         break;
                 }
 
-                if (pModeController != null && pModeController.Ready)
+                if (pModeController != null)
                 {
                     Global.MainForm.StatusText(i18N.Translate("Starting ", pModeController.Name));
                     result = pModeController.Start(server, mode);
@@ -90,7 +117,6 @@ namespace Netch.Controllers
 
                 if (result)
                 {
-                    Logging.Info("模式已启动");
                     switch (mode.Type)
                     {
                         case 0:
@@ -110,7 +136,11 @@ namespace Netch.Controllers
                 }
             }
 
-            if (!result) Stop();
+            if (!result)
+            {
+                Logging.Error("主控制器启动失败");
+                Stop();
+            } 
 
             return result;
         }
@@ -120,8 +150,14 @@ namespace Netch.Controllers
         /// </summary>
         public void Stop()
         {
-            pEncryptedProxyController?.Stop();
-            pModeController?.Stop();
+            var tasks = new[]
+            {
+                Task.Factory.StartNew(() => pEncryptedProxyController?.Stop()),
+                Task.Factory.StartNew(() => UsingPorts.Clear()),
+                Task.Factory.StartNew(() => pModeController?.Stop()),
+                Task.Factory.StartNew(() => pNTTController.Stop())
+            };
+            Task.WaitAll(tasks);
         }
 
         public static void KillProcessByName(string name)

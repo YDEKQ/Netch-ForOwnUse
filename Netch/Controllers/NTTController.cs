@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using Netch.Models;
 using Netch.Utils;
@@ -11,8 +12,8 @@ namespace Netch.Controllers
 
         public NTTController()
         {
-            MainFile = "NTT";
-            InitCheck();
+            Name = "NTT";
+            MainFile = "NTT.exe";
         }
 
         /// <summary>
@@ -21,10 +22,9 @@ namespace Netch.Controllers
         /// <returns></returns>
         public (bool, string, string, string) Start()
         {
-            if (!Ready) return (false, null, null, null);
             try
             {
-                Instance = GetProcess("bin\\NTT.exe");
+                Instance = GetProcess();
 
                 Instance.StartInfo.Arguments = $" {Global.Settings.STUN_Server} {Global.Settings.STUN_Server_Port}";
 
@@ -44,25 +44,23 @@ namespace Netch.Controllers
 
                 return (true, natType, localEnd, publicEnd);
             }
-            catch (Exception)
+            catch (Win32Exception e)
             {
-                Logging.Error("NTT 进程出错");
+                Logging.Error("NTT 进程出错\n" + e);
                 Stop();
                 return (false, null, null, null);
             }
         }
 
-        private void OnOutputDataReceived(object sender, DataReceivedEventArgs e)
+        private new void OnOutputDataReceived(object sender, DataReceivedEventArgs e)
         {
             if (!string.IsNullOrEmpty(e.Data))
                 _lastResult = e.Data;
         }
 
-        /// <summary>
-        ///     无用
-        /// </summary>
         public override void Stop()
         {
+            StopInstance();
         }
     }
 }

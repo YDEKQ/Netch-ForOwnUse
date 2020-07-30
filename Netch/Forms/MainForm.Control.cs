@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,12 +20,9 @@ namespace Netch.Forms
 
         private void ControlFun()
         {
-            //防止模式选择框变成蓝色:D
-            ModeComboBox.Select(0, 0);
-
             if (State == State.Waiting || State == State.Stopped)
             {
-                #region 服务器、模式 需选择
+                // 服务器、模式 需选择
                 if (ServerComboBox.SelectedIndex == -1)
                 {
                     MessageBoxX.Show(i18N.Translate("Please select a server first"));
@@ -33,35 +31,14 @@ namespace Netch.Forms
 
                 if (ModeComboBox.SelectedIndex == -1)
                 {
-                    MessageBoxX.Show(i18N.Translate("Please select an mode first"));
-                    return;
-                }
-                #endregion
-
-                #region 检查端口是否被占用
-                if (PortHelper.PortInUse(Global.Settings.Socks5LocalPort))
-                {
-                    MessageBoxX.Show(i18N.Translate("The Socks5 port is in use. Click OK to modify it."));
-                    SettingsButton.PerformClick();
+                    MessageBoxX.Show(i18N.Translate("Please select a mode first"));
                     return;
                 }
 
-                if (PortHelper.PortInUse(Global.Settings.HTTPLocalPort))
-                {
-                    MessageBoxX.Show(i18N.Translate("The HTTP port is in use. Click OK to modify it."));
-                    SettingsButton.PerformClick();
-                    return;
-                }
+                State = State.Starting;
 
-                if (PortHelper.PortInUse(Global.Settings.RedirectorTCPPort, PortType.TCP))
-                {
-                    MessageBoxX.Show(i18N.Translate("The RedirectorTCP port is in use. Click OK to modify it."));
-                    SettingsButton.PerformClick();
-                    return;
-                }
-                #endregion
-
-                UpdateStatus(State.Starting);
+                // 清除模式搜索框文本选择
+                ModeComboBox.Select(0, 0);
 
                 Task.Run(() =>
                 {
@@ -69,32 +46,38 @@ namespace Netch.Forms
 
                     var server = ServerComboBox.SelectedItem as Models.Server;
                     var mode = ModeComboBox.SelectedItem as Models.Mode;
+                    var result = false;
 
-                    if (_mainController.Start(server, mode))
+                    try
+                    {
+                        // TODO 完善控制器异常处理
+                        result = _mainController.Start(server, mode);
+                    }
+                    catch (Exception e)
+                    {
+                        if (e is DllNotFoundException || e is FileNotFoundException)
+                            MessageBoxX.Show(e.Message + "\n\n" + i18N.Translate("Missing File or runtime components"), owner: this);
+
+                        Netch.Application_OnException(this, new ThreadExceptionEventArgs(e));
+                    }
+
+                    if (result)
                     {
                         Task.Run(() =>
                         {
-                            UpdateStatus(State.Started,
-                                i18N.Translate(StateExtension.GetStatusString(State.Started)) + PortText(server.Type, mode.Type));
-
+                            State = State.Started;
+                            StatusTextAppend(LocalPortText(server.Type, mode.Type));
                             Bandwidth.NetTraffic(server, mode, _mainController);
                         });
-
                         // 如果勾选启动后最小化
                         if (Global.Settings.MinimizeWhenStarted)
                         {
                             WindowState = FormWindowState.Minimized;
-                            NotifyIcon.Visible = true;
 
                             if (_isFirstCloseWindow)
                             {
                                 // 显示提示语
-                                NotifyIcon.ShowBalloonTip(5,
-                                    UpdateChecker.Name,
-                                    i18N.Translate(
-                                        "Netch is now minimized to the notification bar, double click this icon to restore."),
-                                    ToolTipIcon.Info);
-
+                                NotifyTip(i18N.Translate("Netch is now minimized to the notification bar, double click this icon to restore."));
                                 _isFirstCloseWindow = false;
                             }
 
@@ -126,57 +109,59 @@ namespace Netch.Forms
                     }
                     else
                     {
-                        UpdateStatus(State.Stopped, i18N.Translate("Start failed"));
+                        State = State.Stopped;
+                        StatusText(i18N.Translate("Start failed"));
                     }
                 });
             }
             else
             {
-                // 停止
-                UpdateStatus(State.Stopping);
                 Task.Run(() =>
                 {
+                    // 停止
+                    State = State.Stopping;
                     _mainController.Stop();
-                    UpdateStatus(State.Stopped);
-
-                    TestServer();
+                    State = State.Stopped;
                 });
+                Task.Run(TestServer);
             }
         }
 
-        private string PortText(string serverType, int modeType)
+        private static string LocalPortText(string serverType, int modeType)
         {
             var text = new StringBuilder(" (");
-            text.Append(Global.Settings.LocalAddress == "0.0.0.0"
-                ? i18N.Translate("Allow other Devices to connect") + " "
-                : "");
+            if (Global.Settings.LocalAddress == "0.0.0.0")
+                text.Append(i18N.Translate("Allow other Devices to connect") + " ");
             if (serverType == "Socks5")
             {
                 // 不可控Socks5
                 if (modeType == 3 || modeType == 5)
                 {
                     // 可控HTTP
-                    text.Append(
-                        $"HTTP {i18N.Translate("Local Port", ": ")}{Global.Settings.HTTPLocalPort}");
+                    MainController.UsingPorts.Add(Global.Settings.HTTPLocalPort);
+                    text.Append($"HTTP {i18N.Translate("Local Port", ": ")}{Global.Settings.HTTPLocalPort}");
                 }
                 else
                 {
                     // 不可控HTTP
-                    return "";
+                    return string.Empty;
                 }
             }
             else
             {
                 // 可控Socks5
-                text.Append(
-                    $"Socks5 {i18N.Translate("Local Port", ": ")}{Global.Settings.Socks5LocalPort}");
+                MainController.UsingPorts.Add(Global.Settings.Socks5LocalPort);
+                text.Append($"Socks5 {i18N.Translate("Local Port", ": ")}{Global.Settings.Socks5LocalPort}");
                 if (modeType == 3 || modeType == 5)
                 {
-                    //有HTTP
-                    text.Append(
-                        $" | HTTP {i18N.Translate("Local Port", ": ")}{Global.Settings.HTTPLocalPort}");
+                    // 有HTTP
+                    MainController.UsingPorts.Add(Global.Settings.HTTPLocalPort);
+                    text.Append($" | HTTP {i18N.Translate("Local Port", ": ")}{Global.Settings.HTTPLocalPort}");
                 }
             }
+
+            if (modeType == 0)
+                MainController.UsingPorts.Add(Global.Settings.RedirectorTCPPort);
 
             text.Append(")");
             return text.ToString();
