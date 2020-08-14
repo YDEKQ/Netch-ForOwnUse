@@ -104,12 +104,6 @@ namespace Netch.Models
         public int RequestTimeout = 10000;
 
         /// <summary>
-        ///		使用何种模式文件名
-        ///		0 为自定义文件名，1 为使用和备注一致的文件名，2 为使用时间数据作为文件名
-        /// </summary>
-        public int ModeFileNameType = 1;
-
-        /// <summary>
         ///		HTTP 本地端口
         /// </summary>
         public int HTTPLocalPort = 2802;
@@ -123,6 +117,11 @@ namespace Netch.Models
         ///		Redirector TCP 占用端口
         /// </summary>
         public int RedirectorTCPPort = 3901;
+
+        /// <summary>
+        ///		UDP Socket 占用端口
+        /// </summary>
+        public int UDPSocketPort = 18291;
 
         /// <summary>
         ///		HTTP 和 Socks5 本地代理地址
@@ -167,7 +166,7 @@ namespace Netch.Models
         /// <summary>
         ///     STUN测试服务器
         /// </summary>
-        public string STUN_Server = "stun.stunprotocol.org";
+        public string STUN_Server = "stun.syncthing.net";
 
         /// <summary>
         ///     STUN测试服务器

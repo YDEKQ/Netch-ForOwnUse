@@ -35,10 +35,10 @@ namespace Netch.Controllers
 
         public TUNTAPController()
         {
-            Name = "Tap";
+            Name = "tun2socks";
             MainFile = "tun2socks.exe";
-            StartedKeywords("Running");
-            StoppedKeywords("failed", "invalid vconfig file");
+            StartedKeywords.Add("Running");
+            StoppedKeywords.AddRange(new[] {"failed", "invalid vconfig file"});
         }
 
         /// <summary>
@@ -190,16 +190,12 @@ namespace Netch.Controllers
 
         public override bool Start(Server server, Mode mode)
         {
-            Global.MainForm.StatusText(i18N.Translate("Starting Tap"));
-
             _savedMode = mode;
             _savedServer = server;
 
             if (!Configure()) return false;
 
             SetupRouteTable();
-
-            Instance = GetProcess();
 
             var adapterName = TUNTAP.GetName(Global.TUNTAP.ComponentID);
 
@@ -226,35 +222,17 @@ namespace Netch.Controllers
 
             if (Global.Settings.TUNTAP.UseFakeDNS) dns += " -fakeDns";
 
+            var argument = new StringBuilder();
             if (server.Type == "Socks5")
-                Instance.StartInfo.Arguments = $"-proxyServer {server.Hostname}:{server.Port} -tunAddr {Global.Settings.TUNTAP.Address} -tunMask {Global.Settings.TUNTAP.Netmask} -tunGw {Global.Settings.TUNTAP.Gateway} -tunDns {dns} -tunName \"{adapterName}\"";
+                argument.Append($"-proxyServer {server.Hostname}:{server.Port} ");
             else
-                Instance.StartInfo.Arguments = $"-proxyServer 127.0.0.1:{Global.Settings.Socks5LocalPort} -tunAddr {Global.Settings.TUNTAP.Address} -tunMask {Global.Settings.TUNTAP.Netmask} -tunGw {Global.Settings.TUNTAP.Gateway} -tunDns {dns} -tunName \"{adapterName}\"";
+                argument.Append($"-proxyServer 127.0.0.1:{Global.Settings.Socks5LocalPort} ");
 
-            Instance.ErrorDataReceived += OnOutputDataReceived;
-            Instance.OutputDataReceived += OnOutputDataReceived;
+            argument.Append($"-tunAddr {Global.Settings.TUNTAP.Address} -tunMask {Global.Settings.TUNTAP.Netmask} -tunGw {Global.Settings.TUNTAP.Gateway} -tunDns {dns} -tunName \"{adapterName}\"");
 
             State = State.Starting;
-            Instance.Start();
-            Instance.BeginErrorReadLine();
-            Instance.BeginOutputReadLine();
-            Instance.PriorityClass = ProcessPriorityClass.RealTime;
-
-            for (var i = 0; i < 1000; i++)
-            {
-                Thread.Sleep(10);
-
-                switch (State)
-                {
-                    case State.Started:
-                        return true;
-                    case State.Stopped:
-                        Stop();
-                        return false;
-                }
-            }
-
-            return false;
+            if (!StartInstanceAuto(argument.ToString(), ProcessPriorityClass.RealTime)) return false;
+            return true;
         }
 
         /// <summary>
@@ -307,58 +285,63 @@ namespace Netch.Controllers
                 }
             }
 
+            // 根据 IP Index 寻找 出口适配器
+            var errorAdaptersId = new List<string>();
             try
             {
-                try
+                var adapter = NetworkInterface.GetAllNetworkInterfaces().First(_ =>
                 {
-                    var adapter = NetworkInterface.GetAllNetworkInterfaces().First(_ => _.GetIPProperties().GetIPv4Properties().Index == Global.Adapter.Index);
-                    Global.Adapter.Address = adapter.GetIPProperties().UnicastAddresses.First(ip => ip.Address.AddressFamily == AddressFamily.InterNetwork).Address;
-                    Global.Adapter.Gateway = new IPAddress(pRoute.dwForwardNextHop);
-                    Logging.Info($"出口 IPv4 地址：{Global.Adapter.Address}");
-                    Logging.Info($"出口 网关 地址：{Global.Adapter.Gateway}");
-                    Logging.Info($"出口适配器：{adapter.Name} {adapter.Id} {adapter.Description}, index: {Global.Adapter.Index}");
-                    // Ex NetworkInformationException: 此接口不支持 IPv4 协议。
-
-                    // Ex NetworkInformationException: Windows 系统函数调用失败。
-                    // Ex System.ArgumentNullException: source 或 predicate 为 null。
-                }
-                catch (Exception e)
-                {
-                    if (e is InvalidOperationException)
-                        Logging.Error($"找不到网络接口索引为 {Global.Adapter.Index} 的出口适配器");
-                    throw;
-                }
-
-                try
-                {
-                    var adapter = NetworkInterface.GetAllNetworkInterfaces().First(_ => _.Id == Global.TUNTAP.ComponentID);
-                    Global.TUNTAP.Adapter = adapter;
-                    Global.TUNTAP.Index = adapter.GetIPProperties().GetIPv4Properties().Index;
-                    Logging.Info($"TAP 适配器：{adapter.Name} {adapter.Id} {adapter.Description}, index: {Global.TUNTAP.Index}");
-                }
-                catch (Exception e)
-                {
-                    if (e is InvalidOperationException)
-                        Logging.Error($"找不到标识符为 {Global.TUNTAP.ComponentID} 的 TAP 适配器");
-                    throw;
-                }
-
-                return true;
+                    try
+                    {
+                        return _.GetIPProperties().GetIPv4Properties().Index == Global.Adapter.Index;
+                    }
+                    catch (NetworkInformationException)
+                    {
+                        errorAdaptersId.Add(_.Id);
+                        return false;
+                    }
+                });
+                Global.Adapter.Address = adapter.GetIPProperties().UnicastAddresses.First(ip => ip.Address.AddressFamily == AddressFamily.InterNetwork).Address;
+                Global.Adapter.Gateway = new IPAddress(pRoute.dwForwardNextHop);
+                Logging.Info($"出口 IPv4 地址：{Global.Adapter.Address}");
+                Logging.Info($"出口 网关 地址：{Global.Adapter.Gateway}");
+                Logging.Info($"出口适配器：{adapter.Name} {adapter.Id} {adapter.Description}, index: {Global.Adapter.Index}");
             }
-            catch (InvalidOperationException)
+            catch (Exception e)
             {
-                // 理论上如果得到了网络接口的索引/网络适配器的标识符不会找不到网卡
-                // 只是异常处理
+                Logging.Error($"找不到 IP Index 为 {Global.Adapter.Index} 的出口适配器: {e.Message}");
+                PrintAdapters();
+                return false;
+            }
+
+            // 根据 ComponentID 寻找 Tap适配器
+            try
+            {
+                var adapter = NetworkInterface.GetAllNetworkInterfaces().First(_ => _.Id == Global.TUNTAP.ComponentID);
+                Global.TUNTAP.Adapter = adapter;
+                Global.TUNTAP.Index = adapter.GetIPProperties().GetIPv4Properties().Index;
+                Logging.Info($"TAP 适配器：{adapter.Name} {adapter.Id} {adapter.Description}, index: {Global.TUNTAP.Index}");
+            }
+            catch (Exception e)
+            {
+                var msg = e switch
+                {
+                    InvalidOperationException _ => $"找不到标识符为 {Global.TUNTAP.ComponentID} 的 TAP 适配器: {e.Message}",
+                    NetworkInformationException _ => $"获取 Tap 适配器信息错误: {e.Message}",
+                    _ => $"Tap 适配器其他异常: {e}"
+                };
+                Logging.Error(msg);
+                PrintAdapters();
+                return false;
+            }
+
+            return true;
+
+            void PrintAdapters()
+            {
                 Logging.Info("所有适配器:\n" +
                              NetworkInterface.GetAllNetworkInterfaces().Aggregate(string.Empty, (current, adapter)
-                                 => current + $"{adapter.Name} {adapter.Id} {adapter.Description}, index: {Global.TUNTAP.Index}{Global.EOF}"));
-                return false;
-            }
-            catch (NetworkInformationException e)
-            {
-                if (e.ErrorCode == 10043)
-                    MessageBoxX.Show("适配器未开启IPv4协议", LogLevel.ERROR, owner: Global.MainForm);
-                return false;
+                                 => current + $"{ /*如果加了 ’*‘ 代表遍历中出现异常的适配器  */(errorAdaptersId.Contains(adapter.Id) ? "*" : "")}{adapter.Name} {adapter.Id} {adapter.Description}{Global.EOF}"));
             }
         }
 

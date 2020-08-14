@@ -51,6 +51,7 @@ namespace Netch.Forms
 
         private void MainForm_Load(object sender, EventArgs e)
         {
+            OnlyInstance.Called += OnCalled;
             // 计算 ComboBox绘制 目标宽度
             _eWidth = ServerComboBox.Width / 10;
 
@@ -107,6 +108,21 @@ namespace Netch.Forms
             });
         }
 
+        private void OnCalled(object sender, OnlyInstance.Commands e)
+        {
+            switch (e)
+            {
+                case OnlyInstance.Commands.Show:
+                    NotifyIcon_MouseDoubleClick(null, null);
+                    break;
+                case OnlyInstance.Commands.Exit:
+                    Exit(true);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(e), e, null);
+            }
+        }
+
 
         private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
@@ -133,7 +149,7 @@ namespace Netch.Forms
                 // 如果勾选了关闭时退出，自动点击退出按钮
                 else
                 {
-                    Exit(true);
+                    Exit();
                 }
             }
         }
@@ -177,6 +193,7 @@ namespace Netch.Forms
             AddVMessServerToolStripMenuItem.Text = i18N.Translate("Add [VMess] Server");
             AddTrojanServerToolStripMenuItem.Text = i18N.Translate("Add [Trojan] Server");
             ModeToolStripMenuItem.Text = i18N.Translate("Mode");
+            HelpToolStripMenuItem.Text = i18N.Translate("Help");
             CreateProcessModeToolStripMenuItem.Text = i18N.Translate("Create Process Mode");
             SubscribeToolStripMenuItem.Text = i18N.Translate("Subscribe");
             ManageSubscribeLinksToolStripMenuItem.Text = i18N.Translate("Manage Subscribe Links");
@@ -188,11 +205,12 @@ namespace Netch.Forms
             UpdateACLToolStripMenuItem.Text = i18N.Translate("Update ACL");
             updateACLWithProxyToolStripMenuItem.Text = i18N.Translate("Update ACL with proxy");
             reinstallTapDriverToolStripMenuItem.Text = i18N.Translate("Reinstall TUN/TAP driver");
+            CheckForUpdatesToolStripMenuItem.Text = i18N.Translate("Check for updates");
             OpenDirectoryToolStripMenuItem.Text = i18N.Translate("Open Directory");
             AboutToolStripButton.Text = i18N.Translate("About");
+            NewVersionLabel.Text = i18N.Translate("New version available");
             // VersionLabel.Text = i18N.Translate("xxx");
             exitToolStripMenuItem.Text = i18N.Translate("Exit");
-            RelyToolStripMenuItem.Text = i18N.Translate("Unable to start? Click me to download");
             ConfigurationGroupBox.Text = i18N.Translate("Configuration");
             ProfileLabel.Text = i18N.Translate("Profile");
             ModeLabel.Text = i18N.Translate("Mode");
@@ -219,10 +237,7 @@ namespace Netch.Forms
             {
                 MessageBoxX.Show(i18N.Translate("Please press Stop button first"));
 
-                Visible = true;
-                ShowInTaskbar = true; // 显示在系统任务栏 
-                WindowState = FormWindowState.Normal; // 还原窗体 
-                NotifyIcon.Visible = true; // 托盘图标隐藏 
+                NotifyIcon_MouseDoubleClick(null, null);
                 return;
             }
 
@@ -234,18 +249,8 @@ namespace Netch.Forms
                 ControlFun();
             }
 
-            Task.Run(() =>
-            {
-                for (var i = 0; i < 16; i++)
-                {
-                    if (State == State.Waiting || State == State.Stopped)
-                        break;
-                    Thread.Sleep(250);
-                }
-
-                SaveConfigs();
-                State = State.Terminating;
-            });
+            SaveConfigs();
+            State = State.Terminating;
         }
 
         #region MISC
@@ -309,41 +314,48 @@ namespace Netch.Forms
             }
         }
 
-        private void SpeedPictureBox_Click(object sender, EventArgs e)
+        private async void SpeedPictureBox_Click(object sender, EventArgs e)
         {
             Enabled = false;
             StatusText(i18N.Translate("Testing"));
 
-            Task.Run(() =>
+            try
             {
-                TestServer();
-
+                await Task.Run(TestServer);
+            }
+            finally
+            {
                 Enabled = true;
                 StatusText(i18N.Translate("Test done"));
                 Refresh();
-            });
+            }
         }
 
         private void EditModePictureBox_Click(object sender, EventArgs e)
         {
             // 当前ModeComboBox中至少有一项
-            if (ModeComboBox.Items.Count > 0 && ModeComboBox.SelectedIndex != -1)
-            {
-                SaveConfigs();
-                var selectedMode = (Models.Mode) ModeComboBox.SelectedItem;
-                // 只允许修改进程加速的模式
-                if (selectedMode.Type == 0)
-                {
-                    //Process.Start(Environment.CurrentDirectory + "\\mode\\" + selectedMode.FileName + ".txt");
-                    var process = new Process(selectedMode);
-                    process.Text = "Edit Process Mode";
-                    process.Show();
-                    Hide();
-                }
-            }
-            else
+            if (ModeComboBox.Items.Count <= 0 || ModeComboBox.SelectedIndex == -1)
             {
                 MessageBoxX.Show(i18N.Translate("Please select a mode first"));
+                return;
+            }
+
+            SaveConfigs();
+            var selectedMode = (Models.Mode) ModeComboBox.SelectedItem;
+            switch (selectedMode.Type)
+            {
+                case 0:
+                {
+                    var process = new Process(selectedMode);
+                    process.Show();
+                    Hide();
+                    break;
+                }
+                default:
+                {
+                    MessageBoxX.Show($"Current not support editing {selectedMode.TypeToString()} Mode");
+                    break;
+                }
             }
         }
 
@@ -442,15 +454,15 @@ namespace Netch.Forms
             {
                 Visible = true;
                 ShowInTaskbar = true; //显示在系统任务栏 
-                WindowState = FormWindowState.Normal; //还原窗体 
-                NotifyIcon.Visible = true; //托盘图标隐藏 
+                WindowState = FormWindowState.Normal; //还原窗体
             }
 
             Activate();
         }
 
-        private void NotifyTip(string text, int timeout = 5, bool info = true)
+        private void NotifyTip(string text, int timeout = 0, bool info = true)
         {
+            // 会阻塞线程 timeout 秒
             NotifyIcon.ShowBalloonTip(timeout,
                 UpdateChecker.Name,
                 text,
@@ -460,5 +472,15 @@ namespace Netch.Forms
         #endregion
 
         #endregion
+
+        private void ModeComboBox_SelectedIndexChanged(object sender, EventArgs o)
+        {
+            Global.Settings.ModeComboBoxSelectedIndex = ModeComboBox.SelectedIndex;
+        }
+
+        private void ServerComboBox_SelectedIndexChanged(object sender, EventArgs o)
+        {
+            Global.Settings.ServerComboBoxSelectedIndex = ServerComboBox.SelectedIndex;
+        }
     }
 }

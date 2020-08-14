@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Windows.Forms;
@@ -78,16 +79,6 @@ namespace Netch.Forms
             ProxyDNSCheckBox.Checked = Global.Settings.TUNTAP.ProxyDNS;
             UseFakeDNSCheckBox.Checked = Global.Settings.TUNTAP.UseFakeDNS;
 
-            LanguageComboBox.Items.AddRange(i18N.GetTranslateList().ToArray());
-            LanguageComboBox.SelectedItem = Global.Settings.Language;
-
-            ProcessWhitelistModeCheckbox.Checked = Global.Settings.ProcessWhitelistMode;
-
-            ProcessNoProxyForUdpcheckBox.Checked = Global.Settings.ProcessNoProxyForUdp;
-            PrintProxyIPCheckBox.Checked = Global.Settings.ProcessProxyIPLog;
-
-            UDPServerCheckBox.Checked = Global.Settings.UDPServer;
-
             if (Global.Settings.TUNTAP.DNS.Count > 0)
             {
                 var dns = "";
@@ -123,14 +114,18 @@ namespace Netch.Forms
             ModifySystemDNSCheckBox.Checked = Global.Settings.ModifySystemDNS;
             CheckBetaUpdateCheckBox.Checked = Global.Settings.CheckBetaUpdate;
 
+            ProcessWhitelistModeCheckbox.Checked = Global.Settings.ProcessWhitelistMode;
+            ProcessNoProxyForUdpcheckBox.Checked = Global.Settings.ProcessNoProxyForUdp;
+            PrintProxyIPCheckBox.Checked = Global.Settings.ProcessProxyIPLog;
+            UDPServerCheckBox.Checked = Global.Settings.UDPServer;
+
             ProfileCountTextBox.Text = Global.Settings.ProfileCount.ToString();
             TcpingAtStartedCheckBox.Checked = Global.Settings.StartedTcping;
             DetectionIntervalTextBox.Text = Global.Settings.StartedTcping_Interval.ToString();
-            STUN_ServerTextBox.Text = Global.Settings.STUN_Server;
-            STUN_ServerPortTextBox.Text = Global.Settings.STUN_Server_Port.ToString();
             AclAddrTextBox.Text = Global.Settings.ACL;
             LanguageComboBox.Items.AddRange(i18N.GetTranslateList().ToArray());
             LanguageComboBox.SelectedItem = Global.Settings.Language;
+            InitSTUN();
         }
 
         private void InitText()
@@ -161,16 +156,29 @@ namespace Netch.Forms
             TcpingAtStartedCheckBox.Text = i18N.Translate(TcpingAtStartedCheckBox.Text);
             DetectionIntervalLabel.Text = i18N.Translate(DetectionIntervalLabel.Text);
             STUNServerLabel.Text = i18N.Translate(STUNServerLabel.Text);
-            StunTextBoxSplitLabel.Text = i18N.Translate(StunTextBoxSplitLabel.Text);
             AclLabel.Text = i18N.Translate(AclLabel.Text);
             LanguageLabel.Text = i18N.Translate(LanguageLabel.Text);
             ProcessWhitelistModeCheckbox.Text = i18N.Translate(ProcessWhitelistModeCheckbox.Text);
         }
 
+        private void InitSTUN()
+        {
+            try
+            {
+                var stuns = File.ReadLines("bin\\stun.txt");
+                STUN_ServerComboBox.Items.AddRange(stuns.ToArray());
+            }
+            catch (Exception)
+            {
+                // ignored
+            }
+
+            STUN_ServerComboBox.Text = $"{Global.Settings.STUN_Server}:{Global.Settings.STUN_Server_Port}";
+        }
+
         private void SettingForm_Load(object sender, EventArgs e)
         {
             InitText();
-
             InitValue();
         }
 
@@ -195,56 +203,22 @@ namespace Netch.Forms
             Global.Settings.MinimizeWhenStarted = MinimizeWhenStartedCheckBox.Checked;
             Global.Settings.RunAtStartup = RunAtStartupCheckBox.Checked;
             Global.Settings.BootShadowsocksFromDLL = BootShadowsocksFromDLLCheckBox.Checked;
+            Global.Settings.Language = LanguageComboBox.SelectedItem.ToString();
+
             Global.Settings.ProcessWhitelistMode = ProcessWhitelistModeCheckbox.Checked;
             Global.Settings.UDPServer = UDPServerCheckBox.Checked;
             Global.Settings.UDPServerIndex = UDPServerComboBox.SelectedIndex;
-            Global.Settings.Language = LanguageComboBox.SelectedItem.ToString();
             Global.Settings.ProcessNoProxyForUdp = ProcessNoProxyForUdpcheckBox.Checked;
             Global.Settings.ProcessProxyIPLog = PrintProxyIPCheckBox.Checked;
-
-            // 加载系统语言
-            if (Global.Settings.Language.Equals("System"))
-            {
-                // 得到当前线程语言代码
-                var culture = CultureInfo.CurrentCulture.Name;
-
-                // 尝试加载内置中文语言
-                if (culture == "zh-CN")
-                {
-                    // 加载语言
-                    i18N.Load(Encoding.UTF8.GetString(Resources.zh_CN));
-                }
-
-                // 从外置文件中加载语言
-                if (File.Exists($"i18n\\{culture}"))
-                {
-                    // 加载语言
-                    i18N.Load(File.ReadAllText($"i18n\\{culture}"));
-                }
-            }
-
-            if (Global.Settings.Language.Equals("zh-CN"))
-            {
-                // 加载内置中文
-                i18N.Load(Encoding.UTF8.GetString(Resources.zh_CN));
-            }
-            else if (Global.Settings.Language.Equals("en-US"))
-            {
-                // 加载内置英文
-                i18N.Load(Global.Settings.Language);
-            }
-            else if (File.Exists($"i18n\\{Global.Settings.Language}"))
-            {
-                // 从外置文件中加载语言
-                i18N.Load(File.ReadAllText($"i18n\\{Global.Settings.Language}"));
-            }
 
             // 开机自启判断
             var scheduler = new TaskSchedulerClass();
             scheduler.Connect();
             var folder = scheduler.GetFolder("\\");
+
             var taskIsExists = false;
             try
+
             {
                 folder.GetTask("Netch Startup");
                 taskIsExists = true;
@@ -273,8 +247,10 @@ namespace Netch.Forms
                 task.Settings.DisallowStartIfOnBatteries = false;
                 task.Settings.RunOnlyIfIdle = false;
 
-                folder.RegisterTaskDefinition("Netch Startup", task, (int) _TASK_CREATION.TASK_CREATE, null, null, _TASK_LOGON_TYPE.TASK_LOGON_INTERACTIVE_TOKEN, "");
+                folder.RegisterTaskDefinition("Netch Startup", task, (int) _TASK_CREATION.TASK_CREATE, null, null,
+                    _TASK_LOGON_TYPE.TASK_LOGON_INTERACTIVE_TOKEN, "");
             }
+
             else
             {
                 if (taskIsExists)
@@ -288,9 +264,7 @@ namespace Netch.Forms
                 return;
             if (!CheckPortText("RedirectorTCP", ref RedirectorTextBox, ref Global.Settings.RedirectorTCPPort, PortType.TCP))
                 return;
-
             Global.Settings.LocalAddress = AllowDevicesCheckBox.Checked ? "0.0.0.0" : "127.0.0.1";
-
             try
             {
                 var Address = IPAddress.Parse(TUNTAPAddressTextBox.Text);
@@ -348,10 +322,13 @@ namespace Netch.Forms
 
             try
             {
-                var STUN_Server = STUN_ServerTextBox.Text;
+                var stun = STUN_ServerComboBox.Text.Split(':');
+                var STUN_Server = stun[0];
                 Global.Settings.STUN_Server = STUN_Server;
 
-                var STUN_ServerPort = int.Parse(STUN_ServerPortTextBox.Text);
+                var STUN_ServerPort = 3478;
+                if (stun.Length > 1)
+                    STUN_ServerPort = int.Parse(stun[1]);
 
                 if (STUN_ServerPort > 0)
                 {
@@ -394,11 +371,9 @@ namespace Netch.Forms
             }
 
             Global.Settings.ACL = AclAddrTextBox.Text;
-
             Global.Settings.TUNTAP.Address = TUNTAPAddressTextBox.Text;
             Global.Settings.TUNTAP.Netmask = TUNTAPNetmaskTextBox.Text;
             Global.Settings.TUNTAP.Gateway = TUNTAPGatewayTextBox.Text;
-
             Global.Settings.TUNTAP.DNS.Clear();
             foreach (var ip in TUNTAPDNSTextBox.Text.Split(','))
             {
@@ -408,9 +383,7 @@ namespace Netch.Forms
             Global.Settings.TUNTAP.UseCustomDNS = UseCustomDNSCheckBox.Checked;
             Global.Settings.TUNTAP.ProxyDNS = ProxyDNSCheckBox.Checked;
             Global.Settings.TUNTAP.UseFakeDNS = UseFakeDNSCheckBox.Checked;
-
             Global.Settings.ModifySystemDNS = ModifySystemDNSCheckBox.Checked;
-
             Configuration.Save();
             MessageBoxX.Show(i18N.Translate("Saved"));
             Close();

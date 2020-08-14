@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Netch.Controllers;
 using Netch.Forms;
@@ -20,7 +21,7 @@ namespace Netch
             using (var mutex = new Mutex(false, "Global\\Netch"))
             {
                 // 设置当前目录
-                Directory.SetCurrentDirectory(Application.StartupPath);
+                Directory.SetCurrentDirectory(Global.NetchDir);
 
                 // 清理上一次的日志文件，防止淤积占用磁盘空间
                 if (Directory.Exists("logging"))
@@ -39,7 +40,7 @@ namespace Netch
                 }
 
                 // 预创建目录
-                var directories = new[] { "mode", "data", "i18n", "logging" };
+                var directories = new[] {"mode", "data", "i18n", "logging"};
                 foreach (var item in directories)
                 {
                     // 检查是否已经存在
@@ -56,21 +57,24 @@ namespace Netch
                 // 加载语言
                 i18N.Load(Global.Settings.Language);
 
-                // 记录当前系统语言
-                Logging.Info($"当前语言：{Global.Settings.Language}");
-                Logging.Info($"版本: {UpdateChecker.Owner}/{UpdateChecker.Repo}@{UpdateChecker.Version}");
-                Logging.Info($"主程序创建日期: {File.GetCreationTime(Global.NetchDir + "\\Netch.exe"):yyyy-M-d HH:mm}");
-                Logging.Info($"主程序 SHA256: {Utils.Utils.SHA256CheckSum(Application.ExecutablePath)}");
+                Task.Run(() =>
+                {
+                    Logging.Info($"版本: {UpdateChecker.Owner}/{UpdateChecker.Repo}@{UpdateChecker.Version}");
+                    Logging.Info($"主程序 SHA256: {Utils.Utils.SHA256CheckSum(Application.ExecutablePath)}");
+                });
 
                 // 检查是否已经运行
                 /*if (!mutex.WaitOne(0, false))
                 {
-                    // 弹出提示
-                    MessageBoxX.Show(i18N.Translate("Netch is already running"));
+                    OnlyInstance.Send(OnlyInstance.Commands.Show);
+                    Logging.Info("唤起单实例");
 
                     // 退出进程
                     Environment.Exit(1);
                 }*/
+
+                Task.Run(OnlyInstance.Server);
+                Logging.Info("启动单实例");
 
                 // 绑定错误捕获
                 Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
@@ -86,12 +90,6 @@ namespace Netch
         {
             Logging.Error(e.Exception.ToString());
             Utils.Utils.Open(Logging.LogFile);
-            /*if (!e.Exception.ToString().Contains("ComboBox"))
-            {
-                MessageBox.Show(e.Exception.ToString(), "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }*/
-
-            //Application.Exit();
         }
     }
 }

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Netch.Models
 {
-    public class Server
+    public class Server : ICloneable
     {
         /// <summary>
         ///     备注
@@ -144,10 +144,10 @@ namespace Netch.Models
         public string Country;
 
         /// <summary>
-		///		获取备注
-		/// </summary>
-		/// <returns>备注</returns>
-		public override string ToString()
+        ///		获取备注
+        /// </summary>
+        /// <returns>备注</returns>
+        public override string ToString()
         {
             if (string.IsNullOrWhiteSpace(Remark))
             {
@@ -177,6 +177,37 @@ namespace Netch.Models
                     return "WTF";
             }
         }
+
+        public object Clone() => new Server()
+        {
+            Country = Country,
+            AlterID = AlterID,
+            Delay = Delay,
+            EncryptMethod = EncryptMethod,
+            FakeType = FakeType,
+            Group = Group,
+            Host = Host,
+            Hostname = Hostname,
+            OBFS = OBFS,
+            OBFSParam = OBFSParam,
+            Password = Password,
+            Path = Path,
+            Plugin = Plugin,
+            PluginOption = PluginOption,
+            Port = Port,
+            Protocol = Protocol,
+            ProtocolParam = ProtocolParam,
+            QUICSecret = QUICSecret,
+            QUICSecure = QUICSecure,
+            Rate = Rate,
+            Remark = Remark,
+            TLSSecure = TLSSecure,
+            TransferProtocol = TransferProtocol,
+            Type = Type,
+            UseMux = UseMux,
+            UserID = UserID,
+            Username = Username
+        };
 
         /// <summary>
         ///		测试延迟

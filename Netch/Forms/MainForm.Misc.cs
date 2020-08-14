@@ -1,7 +1,14 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Compression;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 using Netch.Controllers;
+using Netch.Forms.Mode;
 using Netch.Utils;
+using Process = System.Diagnostics.Process;
 
 namespace Netch.Forms
 {
@@ -18,11 +25,66 @@ namespace Netch.Forms
 
     partial class MainForm
     {
+        private readonly UpdateChecker _updater = new UpdateChecker();
+
         private void CheckUpdate()
         {
-            var updater = new UpdateChecker();
-            updater.NewVersionFound += (o, args) => { NotifyTip($"{i18N.Translate(@"New version available", ": ")}{updater.LatestVersionNumber}"); };
-            updater.Check(false, Global.Settings.CheckBetaUpdate);
+            _updater.NewVersionFound += (o, args) =>
+            {
+                if (_updater.LatestVersionDownloadUrl.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    NotifyTip($"{i18N.Translate(@"New version available", ": ")}{_updater.LatestVersionNumber}");
+                    NewVersionLabel.Visible = true;
+                }
+            };
+            _updater.Check(Global.Settings.CheckBetaUpdate);
+        }
+
+        private async void NewVersionLabel_Click(object sender, EventArgs e)
+        {
+            if (MessageBoxX.Show(i18N.Translate("Download and install now?"), confirm: true) != DialogResult.OK)
+                return;
+            NotifyTip(i18N.Translate("Start downloading new version"));
+            var fileName = $"Netch{_updater.LatestVersionNumber}.zip";
+            var fileFullPath = Path.Combine(Global.NetchDir, "data", fileName);
+            var updateFileValid = false;
+
+            try
+            {
+                if (File.Exists(fileFullPath))
+                {
+                    if (!(updateFileValid = Utils.Utils.IsZipValid(fileFullPath)))
+                    {
+                        File.Delete(fileFullPath);
+                    }
+                }
+
+                if (!File.Exists(fileFullPath))
+                    await WebUtil.DownloadFileAsync(WebUtil.CreateRequest(_updater.LatestVersionDownloadUrl), fileFullPath);
+                if (updateFileValid || Utils.Utils.IsZipValid(fileFullPath))
+                    RunUpdater();
+                else
+                    throw new InvalidDataException($"{fileFullPath} invalid");
+            }
+            catch (Exception exception)
+            {
+                NotifyTip($"{i18N.Translate("Download update failed")}\n{exception.Message}");
+                Logging.Error($"下载更新失败 {exception}");
+            }
+
+            void RunUpdater()
+            {
+                // if debugging process stopped, debugger will kill child processes!!!!
+                // 调试进程结束,调试器将会杀死子进程
+                // uncomment if(!Debugger.isAttach) block in NetchUpdater Project's main() method and attach to NetchUpdater process to debug
+                // 在 NetchUpdater 项目的  main() 方法中取消注释 if（!Debugger.isAttach）块，并附加到 NetchUpdater 进程进行调试
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = Path.Combine(Global.NetchDir, "NetchUpdater.exe"),
+                    Arguments =
+                        $"{Global.Settings.UDPSocketPort} {fileFullPath} {Global.NetchDir}"
+                });
+            }
         }
     }
 }

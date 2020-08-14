@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Netch.Controllers;
@@ -86,6 +87,28 @@ namespace Netch.Forms
             Hide();
         }
 
+        private async void ReloadModesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Enabled = false;
+            try
+            {
+                await Task.Run(() =>
+                {
+                    SaveConfigs();
+                    InitMode();
+                });
+                NotifyTip(i18N.Translate("Modes have been reload"));
+            }
+            catch (Exception)
+            {
+                // ignored
+            }
+            finally
+            {
+                Enabled = true;
+            }
+        }
+
         #endregion
 
         #region 订阅
@@ -96,8 +119,13 @@ namespace Netch.Forms
             Hide();
         }
 
-        private void UpdateServersFromSubscribeLinksToolStripMenuItem_Click(object sender, EventArgs e)
+        private async void UpdateServersFromSubscribeLinksToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            void DisableItems(bool v)
+            {
+                MenuStrip.Enabled = ConfigurationGroupBox.Enabled = ProfileGroupBox.Enabled = ControlButton.Enabled = v;
+            }
+
             if (Global.Settings.UseProxyToUpdateSubscription && ServerComboBox.SelectedIndex == -1)
                 Global.Settings.UseProxyToUpdateSubscription = false;
 
@@ -107,50 +135,53 @@ namespace Netch.Forms
                 return;
             }
 
-            if (Global.Settings.SubscribeLink.Count > 0)
+            if (Global.Settings.SubscribeLink.Count <= 0)
             {
-                DeleteServerPictureBox.Enabled = false;
-                UpdateServersFromSubscribeLinksToolStripMenuItem.Enabled = false;
+                MessageBoxX.Show(i18N.Translate("No subscription link"));
+                return;
+            }
 
-                Task.Run(() =>
+            StatusText(i18N.Translate("Starting update subscription"));
+            DisableItems(false);
+            try
+            {
+                if (Global.Settings.UseProxyToUpdateSubscription)
                 {
-                    if (Global.Settings.UseProxyToUpdateSubscription)
+                    var mode = new Models.Mode
                     {
-                        var mode = new Models.Mode
-                        {
-                            Remark = "ProxyUpdate",
-                            Type = 5
-                        };
-                        State = State.Starting;
-                        if (_mainController.Start(ServerComboBox.SelectedItem as Models.Server, mode))
-                            StatusText(i18N.Translate("Starting update subscription"));
-                    }
-                    else
-                        StatusText(i18N.Translate("Starting update subscription"));
+                        Remark = "ProxyUpdate",
+                        Type = 5
+                    };
+                    await _mainController.Start(ServerComboBox.SelectedItem as Models.Server, mode);
+                }
 
-                    Task.WaitAll(Global.Settings.SubscribeLink.Select(item => Task.Factory.StartNew(() =>
+                var serverLock = new object();
+
+                await Task.WhenAll(Global.Settings.SubscribeLink.Select(async item => await Task.Run(async () =>
+                {
+                    try
                     {
+                        var request = WebUtil.CreateRequest(item.Link);
+
+                        if (!string.IsNullOrEmpty(item.UserAgent)) request.UserAgent = item.UserAgent;
+                        if (Global.Settings.UseProxyToUpdateSubscription)
+                            request.Proxy = new WebProxy($"http://127.0.0.1:{Global.Settings.HTTPLocalPort}");
+
+                        var str = await WebUtil.DownloadStringAsync(request);
+
                         try
                         {
-                            var request = WebUtil.CreateRequest(item.Link);
+                            str = ShareLink.URLSafeBase64Decode(str);
+                        }
+                        catch
+                        {
+                            // ignored
+                        }
 
-                            if (!string.IsNullOrEmpty(item.UserAgent)) request.UserAgent = item.UserAgent;
-                            if (Global.Settings.UseProxyToUpdateSubscription) request.Proxy = new WebProxy($"http://127.0.0.1:{Global.Settings.HTTPLocalPort}");
-
-                            var str = WebUtil.DownloadString(request);
-
-                            try
-                            {
-                                str = ShareLink.URLSafeBase64Decode(str);
-                            }
-                            catch
-                            {
-                                // ignored
-                            }
-
+                        lock (serverLock)
+                        {
                             Global.Settings.Server = Global.Settings.Server.Where(server => server.Group != item.Remark).ToList();
                             var result = ShareLink.Parse(str);
-
                             if (result != null)
                             {
                                 foreach (var x in result) x.Group = item.Remark;
@@ -159,34 +190,33 @@ namespace Netch.Forms
                                 NotifyTip(i18N.TranslateFormat("Update {1} server(s) from {0}", item.Remark, result.Count));
                             }
                         }
-                        catch (WebException e)
-                        {
-                            NotifyTip($"{i18N.TranslateFormat("Update servers error from {0}", item.Remark)}\n{e.Message}", info: false);
-                        }
-                    })).ToArray());
-
-                    InitServer();
-
-                    Configuration.Save();
-                    NotifyTip(i18N.Translate("Subscription updated"));
-
-                    if (Global.Settings.UseProxyToUpdateSubscription)
-                    {
-                        _mainController.Stop();
-                        State = State.Stopped;
                     }
+                    catch (WebException e)
+                    {
+                        NotifyTip($"{i18N.TranslateFormat("Update servers error from {0}", item.Remark)}\n{e.Message}", info: false);
+                    }
+                    catch (Exception e)
+                    {
+                        Logging.Error(e.ToString());
+                    }
+                })).ToArray());
 
-                    State = State.Waiting;
-                    DeleteModePictureBox.Enabled = true;
-                    MenuStrip.Enabled = ConfigurationGroupBox.Enabled = ControlButton.Enabled = SettingsButton.Enabled = true;
-                    UpdateServersFromSubscribeLinksToolStripMenuItem.Enabled = true;
-                });
-
-                NotifyTip(i18N.Translate("Updating in the background"));
+                Configuration.Save();
+                await Task.Run(InitServer);
+                StatusText(i18N.Translate("Subscription updated"));
             }
-            else
+            catch (Exception)
             {
-                MessageBoxX.Show(i18N.Translate("No subscription link"));
+                // ignored
+            }
+            finally
+            {
+                if (Global.Settings.UseProxyToUpdateSubscription)
+                {
+                    await _mainController.Stop();
+                }
+
+                DisableItems(true);
             }
         }
 
@@ -194,54 +224,74 @@ namespace Netch.Forms
 
         #region 选项
 
+        private void CheckForUpdatesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Task.Run(() =>
+            {
+                void OnNewVersionNotFound(object o, EventArgs args)
+                {
+                    _updater.NewVersionNotFound -= OnNewVersionNotFound;
+                    NotifyTip(i18N.Translate("Already latest version"));
+                }
+
+                void OnNewVersionFoundFailed(object o, EventArgs args)
+                {
+                    _updater.NewVersionFoundFailed -= OnNewVersionFoundFailed;
+                    NotifyTip(i18N.Translate("New version found failed"), info: false);
+                }
+
+                _updater.NewVersionNotFound += OnNewVersionNotFound;
+                _updater.NewVersionFoundFailed += OnNewVersionFoundFailed;
+                CheckUpdate();
+            });
+        }
+
         private void OpenDirectoryToolStripMenuItem_Click(object sender, EventArgs e)
         {
             Utils.Utils.Open(".\\");
         }
 
-        private void CleanDNSCacheToolStripMenuItem_Click(object sender, EventArgs e)
+        private async void CleanDNSCacheToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Task.Run(() =>
+            try
             {
-                DNS.Cache.Clear();
-                NotifyTip(i18N.Translate("DNS cache cleanup succeeded"));
-            });
-        }
-
-        private void ReloadModesToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            Enabled = false;
-            SaveConfigs();
-            Task.Run(() =>
+                await Task.Run(() => DNS.Cache.Clear());
+                StatusText(i18N.Translate("DNS cache cleanup succeeded"));
+            }
+            catch (Exception)
             {
-                InitMode();
-
-                NotifyTip(i18N.Translate("Modes have been reload"));
-                Enabled = true;
-            });
+                // ignored
+            }
         }
 
         private void updateACLWithProxyToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            UpdateACL(true, sender);
+            UpdateACL(true);
         }
 
         private void updateACLToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            UpdateACL(false, sender);
+            UpdateACL(false);
         }
 
-        private void UpdateACL(bool useProxy, object sender)
+        private async void UpdateACL(bool useProxy)
         {
+            void DisableItems(bool v)
+            {
+                UpdateACLToolStripMenuItem.Enabled = updateACLWithProxyToolStripMenuItem.Enabled = v;
+            }
+
             if (useProxy && ServerComboBox.SelectedIndex == -1)
             {
                 MessageBoxX.Show(i18N.Translate("Please select a server first"));
                 return;
             }
 
-            ((ToolStripMenuItem) sender).Enabled = false;
+            DisableItems(false);
 
-            Task.Run(async () =>
+
+            NotifyTip(i18N.Translate("Updating in the background"));
+            try
             {
                 if (useProxy)
                 {
@@ -251,88 +301,75 @@ namespace Netch.Forms
                         Type = 5
                     };
                     State = State.Starting;
-                    if (_mainController.Start(ServerComboBox.SelectedItem as Models.Server, mode))
-                        StatusText(i18N.Translate("Updating in the background"));
+                    await _mainController.Start(ServerComboBox.SelectedItem as Models.Server, mode);
                 }
 
-                try
-                {
-                    var req = WebUtil.CreateRequest(Global.Settings.ACL);
-                    if (useProxy)
-                        req.Proxy = new WebProxy($"http://127.0.0.1:{Global.Settings.HTTPLocalPort}");
+                var req = WebUtil.CreateRequest(Global.Settings.ACL);
+                if (useProxy)
+                    req.Proxy = new WebProxy($"http://127.0.0.1:{Global.Settings.HTTPLocalPort}");
 
-                    await WebUtil.DownloadFileAsync(req, Path.Combine(Global.NetchDir, "bin\\default.acl"));
-                    NotifyTip(i18N.Translate("ACL updated successfully"));
-                }
-                catch (Exception e)
+                await WebUtil.DownloadFileAsync(req, Path.Combine(Global.NetchDir, "bin\\default.acl"));
+                NotifyTip(i18N.Translate("ACL updated successfully"));
+            }
+            catch (Exception e)
+            {
+                NotifyTip(i18N.Translate("ACL update failed") + "\n" + e.Message, info: false);
+                Logging.Error("更新 ACL 失败！" + e);
+            }
+            finally
+            {
+                if (useProxy)
                 {
-                    NotifyTip(i18N.Translate("ACL update failed") + "\n" + e.Message, info: false);
-                    Logging.Error("更新 ACL 失败！" + e);
-                    if (!(e is WebException))
-                        throw;
+                    await _mainController.Stop();
+                    State = State.Stopped;
                 }
-                finally
-                {
-                    ((ToolStripMenuItem) sender).Enabled = true;
-                    if (useProxy)
-                    {
-                        _mainController.Stop();
-                        State = State.Stopped;
-                    }
 
-                    State = State.Waiting;
-                }
-            });
+                DisableItems(true);
+            }
         }
 
-
-        private void UninstallServiceToolStripMenuItem_Click(object sender, EventArgs e)
+        private async void UninstallServiceToolStripMenuItem_Click(object sender, EventArgs e)
         {
             Enabled = false;
             StatusText(i18N.Translate("Uninstalling NF Service"));
-
-            Task.Run(() =>
+            try
             {
-                try
+                await Task.Run(() =>
                 {
                     if (NFController.UninstallDriver())
                     {
                         StatusText(i18N.Translate("Service has been uninstalled"));
                     }
-                }
-                catch (Exception e)
-                {
-                    MessageBoxX.Show(e.ToString(), LogLevel.ERROR);
-                    Console.WriteLine(e);
-                    throw;
-                }
-
+                });
+            }
+            finally
+            {
                 Enabled = true;
-            });
+            }
         }
 
-        private void reinstallTapDriverToolStripMenuItem_Click(object sender, EventArgs e)
+        private async void reinstallTapDriverToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Task.Run(() =>
+            StatusText(i18N.Translate("Reinstalling TUN/TAP driver"));
+            Enabled = false;
+            try
             {
-                StatusText(i18N.Translate("Reinstalling TUN/TAP driver"));
-                Enabled = false;
-                try
+                await Task.Run(() =>
                 {
                     Configuration.deltapall();
                     Configuration.addtap();
-                    NotifyTip(i18N.Translate("Reinstall TUN/TAP driver successfully"));
-                }
-                catch
-                {
-                    NotifyTip(i18N.Translate("Reinstall TUN/TAP driver failed"), info: false);
-                }
-                finally
-                {
-                    State = State.Waiting;
-                    Enabled = true;
-                }
-            });
+                });
+                StatusText(i18N.Translate("Reinstall TUN/TAP driver successfully"));
+            }
+            catch
+            {
+                NotifyTip(i18N.Translate("Reinstall TUN/TAP driver failed"), info: false);
+            }
+            finally
+            {
+                State = State.Waiting;
+                Enabled = true;
+            }
         }
 
         #endregion
@@ -341,11 +378,6 @@ namespace Netch.Forms
         private void exitToolStripMenuItem_Click(object sender, EventArgs e)
         {
             Exit(true);
-        }
-
-        private void RelyToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            Utils.Utils.Open("https://mega.nz/file/9OQ1EazJ#0pjJ3xt57AVLr29vYEEv15GSACtXVQOGlEOPpi_2Ico");
         }
 
         private void VersionLabel_Click(object sender, EventArgs e)
