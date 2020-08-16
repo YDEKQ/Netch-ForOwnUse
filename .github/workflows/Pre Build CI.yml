@@ -19,6 +19,14 @@ jobs:
     - name: Update submodules
       uses: snickerbockers/submodules-init@v4
 
+    - name: Restore NuGet Packages Cache
+      uses: actions/cache@v2
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('Netch/Netch.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
     - name: Restore NuGet Package
       run: nuget restore Netch.sln
 
