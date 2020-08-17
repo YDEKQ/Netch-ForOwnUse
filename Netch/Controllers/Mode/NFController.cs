@@ -49,6 +49,7 @@ namespace Netch.Controllers
         {
             Name = "RedirectorMod";
             MainFile = "Redirector.exe";
+            InstanceOutputEncoding = "utf-8";
             StartedKeywords.Add("Redirect TCP to");
             // StoppedKeywords.AddRange(new[] {"Failed", "Unable"});
         }
