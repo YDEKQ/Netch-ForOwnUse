@@ -1,12 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.ServiceProcess;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using Netch.Models;
 using Netch.Utils;
@@ -282,23 +279,32 @@ namespace Netch.Controllers
             return true;
         }
 
-        public override void Stop()
+        public override async void Stop()
         {
-            Task.Run(() =>
+            var tasks = new Task[]
             {
-                if (Global.Settings.ModifySystemDNS)
-                    //恢复系统DNS
-                    DNS.SetDNS(_sysDns);
-            });
-            StopInstance();
-            try
-            {
-                UdpEncryptedProxy.Stop();
-            }
-            catch (Exception e)
-            {
-                Logging.Error($"停止 {MainFile}.exe 错误：\n" + e);
-            }
+                Task.Run(() =>
+                {
+                    if (Global.Settings.ModifySystemDNS)
+                        //恢复系统DNS
+                        DNS.SetDNS(_sysDns);
+                }),
+                Task.Run(StopInstance),
+                Task.Run(() =>
+                {
+                    if (UdpEncryptedProxy == null)
+                        return;
+                    try
+                    {
+                        UdpEncryptedProxy?.Stop();
+                    }
+                    catch (Exception e)
+                    {
+                        Logging.Error($"停止 {UdpEncryptedProxy.MainFile} 错误：\n" + e);
+                    }
+                })
+            };
+            await Task.WhenAll(tasks);
         }
 
         /// <summary>
