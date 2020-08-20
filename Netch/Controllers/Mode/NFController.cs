@@ -279,7 +279,7 @@ namespace Netch.Controllers
             return true;
         }
 
-        public override async void Stop()
+        public override void Stop()
         {
             var tasks = new Task[]
             {
@@ -304,7 +304,7 @@ namespace Netch.Controllers
                     }
                 })
             };
-            await Task.WhenAll(tasks);
+            Task.WaitAll(tasks);
         }
 
         /// <summary>
