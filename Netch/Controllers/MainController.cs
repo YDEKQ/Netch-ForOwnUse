@@ -148,7 +148,7 @@ namespace Netch.Controllers
             if (result)
             {
                 // 加密代理成功启动
-                UsingPorts.Add(Global.Settings.Socks5LocalPort); // 记录Socks5使用端口
+                UsingPorts.Add(pEncryptedProxyController?.Socks5LocalPort ?? server.Port); // 记录Socks5使用端口
 
                 switch (mode.Type)
                 {
@@ -210,9 +210,14 @@ namespace Netch.Controllers
                                 Global.MainForm.NatTypeStatusText(i18N.Translate("Starting NatTester"));
                                 // Thread.Sleep(1000);
                                 var (nttResult, natType, localEnd, publicEnd) = pNTTController.Start();
-                                var country = Utils.Utils.GetCityCode(publicEnd);
 
-                                if (nttResult) Global.MainForm.NatTypeStatusText(natType, country);
+                                if (nttResult)
+                                {
+                                    var country = Utils.Utils.GetCityCode(publicEnd);
+                                    Global.MainForm.NatTypeStatusText(natType, country);
+                                }
+                                else
+                                    Global.MainForm.NatTypeStatusText(natType);
                             });
                             break;
                     }
@@ -233,6 +238,22 @@ namespace Netch.Controllers
             }
 
             return result;
+        }
+
+        /// <summary>
+        ///     重测NAT
+        /// </summary>
+        public void RetryNatTest()
+        {
+            _ = Task.Run(() =>
+            {
+                Global.MainForm.NatTypeStatusText(i18N.Translate("Starting NatTester"));
+                // Thread.Sleep(1000);
+                var (nttResult, natType, localEnd, publicEnd) = pNTTController.Start();
+                var country = Utils.Utils.GetCityCode(publicEnd);
+
+                if (nttResult) Global.MainForm.NatTypeStatusText(natType, country);
+            });
         }
 
         /// <summary>

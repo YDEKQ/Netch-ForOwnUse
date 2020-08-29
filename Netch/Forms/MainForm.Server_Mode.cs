@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Netch.Utils;
@@ -15,6 +16,17 @@ namespace Netch.Forms
     {
         #region Server
 
+        private void InitServer()
+        {
+            var comboBoxInitialized = _comboBoxInitialized;
+            _comboBoxInitialized = false;
+
+            ServerComboBox.Items.Clear();
+            ServerComboBox.Items.AddRange(Global.Settings.Server.ToArray());
+            SelectLastServer();
+            _comboBoxInitialized = comboBoxInitialized;
+        }
+
         private static void TestServer()
         {
             try
@@ -28,11 +40,8 @@ namespace Netch.Forms
             }
         }
 
-        public void InitServer()
+        public void SelectLastServer()
         {
-            ServerComboBox.Items.Clear();
-            ServerComboBox.Items.AddRange(Global.Settings.Server.ToArray());
-
             // 如果值合法，选中该位置
             if (Global.Settings.ServerComboBoxSelectedIndex > 0 &&
                 Global.Settings.ServerComboBoxSelectedIndex < ServerComboBox.Items.Count)
@@ -52,95 +61,18 @@ namespace Netch.Forms
 
         #region Mode
 
-        private void InitMode()
+        public void InitMode()
         {
+            var comboBoxInitialized = _comboBoxInitialized;
+            _comboBoxInitialized = false;
+
             ModeComboBox.Items.Clear();
-            Global.ModeFiles.Clear();
-
-            if (Directory.Exists("mode"))
-            {
-                foreach (var name in Directory.GetFiles("mode", "*.txt"))
-                {
-                    var ok = true;
-                    var mode = new Models.Mode();
-
-                    using (var sr = new StringReader(File.ReadAllText(name)))
-                    {
-                        var i = 0;
-                        string text;
-
-                        while ((text = sr.ReadLine()) != null)
-                        {
-                            if (i == 0)
-                            {
-                                var splited = text.Trim().Substring(1).Split(',');
-
-                                if (splited.Length == 0)
-                                {
-                                    ok = false;
-                                    break;
-                                }
-
-                                if (splited.Length >= 1)
-                                {
-                                    mode.Remark = i18N.Translate(splited[0].Trim());
-                                }
-
-                                if (splited.Length >= 2)
-                                {
-                                    if (int.TryParse(splited[1], out var result))
-                                    {
-                                        mode.Type = result;
-                                    }
-                                    else
-                                    {
-                                        ok = false;
-                                        break;
-                                    }
-                                }
-
-                                if (splited.Length >= 3)
-                                {
-                                    if (int.TryParse(splited[2], out var result))
-                                    {
-                                        mode.BypassChina = result == 1;
-                                    }
-                                    else
-                                    {
-                                        ok = false;
-                                        break;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                if (!text.StartsWith("#") && !string.IsNullOrWhiteSpace(text))
-                                {
-                                    mode.Rule.Add(text.Trim());
-                                }
-                            }
-
-                            i++;
-                        }
-                    }
-
-                    if (ok)
-                    {
-                        mode.FileName = Path.GetFileNameWithoutExtension(name);
-                        Global.ModeFiles.Add(mode);
-                    }
-                }
-
-                var array = Global.ModeFiles.ToArray();
-                Array.Sort(array, (a, b) => string.Compare(a.Remark, b.Remark, StringComparison.Ordinal));
-
-                ModeComboBox.Items.AddRange(array);
-
-                SelectLastMode();
-            }
+            ModeComboBox.Items.AddRange(Global.Modes.ToArray());
+            SelectLastMode();
+            _comboBoxInitialized = comboBoxInitialized;
         }
 
-        private void SelectLastMode()
+        public void SelectLastMode()
         {
             // 如果值合法，选中该位置
             if (Global.Settings.ModeComboBoxSelectedIndex > 0 &&
@@ -155,29 +87,6 @@ namespace Netch.Forms
             }
 
             // 如果当前 ModeComboBox 中没元素，不做处理
-        }
-
-        public void AddMode(Models.Mode mode)
-        {
-            ModeComboBox.Items.Clear();
-            Global.ModeFiles.Add(mode);
-            var array = Global.ModeFiles.ToArray();
-            Array.Sort(array, (a, b) => string.Compare(a.Remark, b.Remark, StringComparison.Ordinal));
-            ModeComboBox.Items.AddRange(array);
-
-            SelectLastMode();
-        }
-
-        public void UpdateMode(Models.Mode NewMode, Models.Mode OldMode)
-        {
-            ModeComboBox.Items.Clear();
-            Global.ModeFiles.Remove(OldMode);
-            Global.ModeFiles.Add(NewMode);
-            var array = Global.ModeFiles.ToArray();
-            Array.Sort(array, (a, b) => string.Compare(a.Remark, b.Remark, StringComparison.Ordinal));
-            ModeComboBox.Items.AddRange(array);
-
-            SelectLastMode();
         }
 
         #endregion

@@ -88,6 +88,7 @@ namespace Netch.Forms
 
                         LastUploadBandwidth = 0;
                         LastDownloadBandwidth = 0;
+                        Bandwidth.Stop();
 
                         ProfileGroupBox.Enabled = true;
                         StartDisableItems(true);
@@ -125,6 +126,7 @@ namespace Netch.Forms
                 {
                     NatTypeStatusLabel.Text = String.Format("NAT{0}{1}", i18N.Translate(": "), text);
                 }
+
                 if (int.TryParse(text, out int natType))
                 {
                     if (natType > 0 && natType < 5)
@@ -132,6 +134,10 @@ namespace Netch.Forms
                         NatTypeStatusLightLabel.Visible = true;
                         UpdateNatTypeLight(natType);
                     }
+                }
+                else
+                {
+                    NatTypeStatusLightLabel.Visible = false;
                 }
             }
             else

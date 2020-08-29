@@ -31,35 +31,16 @@ namespace Netch.Forms
             CheckForIllegalCrossThreadCalls = false;
         }
 
-        private void SaveConfigs()
-        {
-            Global.Settings.ServerComboBoxSelectedIndex = ServerComboBox.SelectedIndex;
-            if (ModeComboBox.Items.Count != 0 && ModeComboBox.SelectedItem != null)
-            {
-                if (ModeComboBox.Tag is object[] list)
-                {
-                    Global.Settings.ModeComboBoxSelectedIndex = list.ToList().IndexOf(ModeComboBox.SelectedItem);
-                }
-                else
-                {
-                    Global.Settings.ModeComboBoxSelectedIndex = ModeComboBox.Items.IndexOf(ModeComboBox.SelectedItem);
-                }
-            }
-
-            Configuration.Save();
-        }
-
         private void MainForm_Load(object sender, EventArgs e)
         {
             OnlyInstance.Called += OnCalled;
             // 计算 ComboBox绘制 目标宽度
             _eWidth = ServerComboBox.Width / 10;
 
-            // 加载服务器
-            InitServer();
-
-            // 加载模式
+            Modes.Load();
             InitMode();
+            InitServer();
+            _comboBoxInitialized = true;
 
             // 加载翻译
             InitText();
@@ -162,15 +143,8 @@ namespace Netch.Forms
 
         private void SettingsButton_Click(object sender, EventArgs e)
         {
-            (Global.SettingForm = new SettingForm()).Show();
             Hide();
-        }
-
-
-        private void MainForm_VisibleChanged(object sender, EventArgs e)
-        {
-            if (!Visible)
-                return;
+            new SettingForm().ShowDialog();
 
             if (i18N.LangCode != Global.Settings.Language)
             {
@@ -181,6 +155,8 @@ namespace Netch.Forms
 
             if (ProfileButtons.Count != Global.Settings.ProfileCount)
                 InitProfile();
+
+            Show();
         }
 
         private void InitText()
@@ -249,7 +225,7 @@ namespace Netch.Forms
                 ControlFun();
             }
 
-            SaveConfigs();
+            Configuration.Save();
             State = State.Terminating;
         }
 
@@ -281,37 +257,27 @@ namespace Netch.Forms
 
         private void EditServerPictureBox_Click(object sender, EventArgs e)
         {
-            SaveConfigs();
             // 当前ServerComboBox中至少有一项
-            if (ServerComboBox.SelectedIndex != -1)
-            {
-                switch (Global.Settings.Server[ServerComboBox.SelectedIndex].Type)
-                {
-                    case "Socks5":
-                        new Socks5(ServerComboBox.SelectedIndex).Show();
-                        break;
-                    case "SS":
-                        new Shadowsocks(ServerComboBox.SelectedIndex).Show();
-                        break;
-                    case "SSR":
-                        new ShadowsocksR(ServerComboBox.SelectedIndex).Show();
-                        break;
-                    case "VMess":
-                        new VMess(ServerComboBox.SelectedIndex).Show();
-                        break;
-                    case "Trojan":
-                        new Trojan(ServerComboBox.SelectedIndex).Show();
-                        break;
-                    default:
-                        return;
-                }
-
-                Hide();
-            }
-            else
+            if (ServerComboBox.SelectedIndex == -1)
             {
                 MessageBoxX.Show(i18N.Translate("Please select a server first"));
+                return;
             }
+
+            Form server = Global.Settings.Server[ServerComboBox.SelectedIndex].Type switch
+            {
+                "Socks5" => new Socks5(Global.Settings.Server[ServerComboBox.SelectedIndex]),
+                "SS" => new Shadowsocks(Global.Settings.Server[ServerComboBox.SelectedIndex]),
+                "SSR" => new ShadowsocksR(Global.Settings.Server[ServerComboBox.SelectedIndex]),
+                "VMess" => new VMess(Global.Settings.Server[ServerComboBox.SelectedIndex]),
+                "Trojan" => new Trojan(Global.Settings.Server[ServerComboBox.SelectedIndex]),
+                _ => null
+            };
+            Hide();
+            server?.ShowDialog();
+            InitServer();
+            Configuration.Save();
+            Show();
         }
 
         private async void SpeedPictureBox_Click(object sender, EventArgs e)
@@ -340,15 +306,15 @@ namespace Netch.Forms
                 return;
             }
 
-            SaveConfigs();
             var selectedMode = (Models.Mode) ModeComboBox.SelectedItem;
             switch (selectedMode.Type)
             {
                 case 0:
                 {
-                    var process = new Process(selectedMode);
-                    process.Show();
                     Hide();
+                    new Process(selectedMode).ShowDialog();
+                    InitMode();
+                    Show();
                     break;
                 }
                 default:
@@ -362,70 +328,59 @@ namespace Netch.Forms
         private void DeleteModePictureBox_Click(object sender, EventArgs e)
         {
             // 当前ModeComboBox中至少有一项
-            if (ModeComboBox.Items.Count > 0 && ModeComboBox.SelectedIndex != -1)
-            {
-                var selectedMode = (Models.Mode) ModeComboBox.SelectedItem;
-
-                //删除模式文件
-                selectedMode.DeleteFile("mode");
-
-                ModeComboBox.Items.Clear();
-                Global.ModeFiles.Remove(selectedMode);
-                var array = Global.ModeFiles.ToArray();
-                Array.Sort(array, (a, b) => string.Compare(a.Remark, b.Remark, StringComparison.Ordinal));
-                ModeComboBox.Items.AddRange(array);
-
-                SelectLastMode();
-                Configuration.Save();
-            }
-            else
+            if (ModeComboBox.Items.Count <= 0 || ModeComboBox.SelectedIndex == -1)
             {
                 MessageBoxX.Show(i18N.Translate("Please select a mode first"));
+                return;
             }
+
+            var selectedMode = (Models.Mode) ModeComboBox.SelectedItem;
+            this.ModeComboBox.Items.Remove(selectedMode);
+            Modes.Delete(selectedMode);
+
+            SelectLastMode();
         }
 
         private void CopyLinkPictureBox_Click(object sender, EventArgs e)
         {
             // 当前ServerComboBox中至少有一项
-            if (ServerComboBox.SelectedIndex != -1)
-            {
-                var selectedMode = (Models.Server) ServerComboBox.SelectedItem;
-                try
-                {
-                    //听说巨硬BUG经常会炸，所以Catch一下 :D
-                    Clipboard.SetText(ShareLink.GetShareLink(selectedMode));
-                }
-                catch (Exception)
-                {
-                    // ignored
-                }
-            }
-            else
+            if (ServerComboBox.SelectedIndex == -1)
             {
                 MessageBoxX.Show(i18N.Translate("Please select a server first"));
+                return;
+            }
+
+            var selectedMode = (Models.Server) ServerComboBox.SelectedItem;
+            try
+            {
+                //听说巨硬BUG经常会炸，所以Catch一下 :D
+                Clipboard.SetText(ShareLink.GetShareLink(selectedMode));
+            }
+            catch (Exception)
+            {
+                // ignored
             }
         }
 
         private void DeleteServerPictureBox_Click(object sender, EventArgs e)
         {
             // 当前 ServerComboBox 中至少有一项
-            if (ServerComboBox.SelectedIndex != -1)
-            {
-                var index = ServerComboBox.SelectedIndex;
-
-                Global.Settings.Server.Remove(ServerComboBox.SelectedItem as Models.Server);
-                ServerComboBox.Items.RemoveAt(index);
-
-                if (ServerComboBox.Items.Count > 0)
-                {
-                    ServerComboBox.SelectedIndex = index != 0 ? index - 1 : index;
-                }
-
-                Configuration.Save();
-            }
-            else
+            if (ServerComboBox.SelectedIndex == -1)
             {
                 MessageBoxX.Show(i18N.Translate("Please select a server first"));
+                return;
+            }
+
+            var index = ServerComboBox.SelectedIndex;
+
+            Global.Settings.Server.Remove(ServerComboBox.SelectedItem as Models.Server);
+            InitServer();
+
+            Configuration.Save();
+
+            if (ServerComboBox.Items.Count > 0)
+            {
+                ServerComboBox.SelectedIndex = index != 0 ? index - 1 : index;
             }
         }
 
@@ -473,14 +428,27 @@ namespace Netch.Forms
 
         #endregion
 
+        private bool _comboBoxInitialized = false;
+
         private void ModeComboBox_SelectedIndexChanged(object sender, EventArgs o)
         {
+            if (!_comboBoxInitialized) return;
             Global.Settings.ModeComboBoxSelectedIndex = ModeComboBox.SelectedIndex;
         }
 
         private void ServerComboBox_SelectedIndexChanged(object sender, EventArgs o)
         {
+            if (!_comboBoxInitialized) return;
             Global.Settings.ServerComboBoxSelectedIndex = ServerComboBox.SelectedIndex;
+        }
+
+        private void NatTypeStatusLabel_Click(object sender, EventArgs e)
+        {
+            //一个不太优雅的🔒
+            if (_state == State.Started && NatTypeStatusLabel.ToString().Contains("["))
+            {
+                _mainController.RetryNatTest();
+            }
         }
     }
 }

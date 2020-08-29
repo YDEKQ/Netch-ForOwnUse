@@ -35,7 +35,10 @@ namespace Netch.Forms
 
                 if (result != null)
                 {
-                    Global.Settings.Server.AddRange(result);
+                    foreach (var server in result)
+                    {
+                        Global.Settings.Server.Add(server);
+                    }
                 }
                 else
                 {
@@ -47,34 +50,23 @@ namespace Netch.Forms
             }
         }
 
-        private void AddSocks5ServerToolStripMenuItem_Click(object sender, EventArgs e)
+        private void AddServerToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            new Socks5().Show();
-            Hide();
-        }
+            Form form = ((ToolStripMenuItem) sender).Name switch
+            {
+                "AddSocks5ServerToolStripMenuItem" => new Socks5(),
+                "AddShadowsocksServerToolStripMenuItem" => new Shadowsocks(),
+                "AddShadowsocksRServerToolStripMenuItem" => new ShadowsocksR(),
+                "AddVMessServerToolStripMenuItem" => new VMess(),
+                "AddTrojanServerToolStripMenuItem" => new Trojan(),
+                _ => null
+            };
 
-        private void AddShadowsocksServerToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            new Shadowsocks().Show();
             Hide();
-        }
-
-        private void AddShadowsocksRServerToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            new ShadowsocksR().Show();
-            Hide();
-        }
-
-        private void AddVMessServerToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            new VMess().Show();
-            Hide();
-        }
-
-        private void AddTrojanServerToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            new Trojan().Show();
-            Hide();
+            form?.ShowDialog();
+            InitServer();
+            Configuration.Save();
+            Show();
         }
 
         #endregion
@@ -83,20 +75,18 @@ namespace Netch.Forms
 
         private void CreateProcessModeToolStripButton_Click(object sender, EventArgs e)
         {
-            new Process().Show();
             Hide();
+            new Process().ShowDialog();
+            Show();
         }
 
-        private async void ReloadModesToolStripMenuItem_Click(object sender, EventArgs e)
+        private void ReloadModesToolStripMenuItem_Click(object sender, EventArgs e)
         {
             Enabled = false;
             try
             {
-                await Task.Run(() =>
-                {
-                    SaveConfigs();
-                    InitMode();
-                });
+                Modes.Load();
+                InitMode();
                 NotifyTip(i18N.Translate("Modes have been reload"));
             }
             catch (Exception)
@@ -115,8 +105,10 @@ namespace Netch.Forms
 
         private void ManageSubscribeLinksToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            new SubscribeForm().Show();
             Hide();
+            new SubscribeForm().ShowDialog();
+            InitServer();
+            Show();
         }
 
         private async void UpdateServersFromSubscribeLinksToolStripMenuItem_Click(object sender, EventArgs e)
@@ -180,15 +172,19 @@ namespace Netch.Forms
 
                         lock (serverLock)
                         {
-                            Global.Settings.Server = Global.Settings.Server.Where(server => server.Group != item.Remark).ToList();
+                            Global.Settings.Server.RemoveAll(server => server.Group == item.Remark);
+
                             var result = ShareLink.Parse(str);
                             if (result != null)
                             {
-                                foreach (var x in result) x.Group = item.Remark;
-
-                                Global.Settings.Server.AddRange(result);
-                                NotifyTip(i18N.TranslateFormat("Update {1} server(s) from {0}", item.Remark, result.Count));
+                                foreach (var server in result)
+                                {
+                                    server.Group = item.Remark;
+                                    Global.Settings.Server.Add(server);
+                                }
                             }
+
+                            NotifyTip(i18N.TranslateFormat("Update {1} server(s) from {0}", item.Remark, result?.Count ?? 0));
                         }
                     }
                     catch (WebException e)
@@ -201,8 +197,8 @@ namespace Netch.Forms
                     }
                 })).ToArray());
 
+                InitServer();
                 Configuration.Save();
-                await Task.Run(InitServer);
                 StatusText(i18N.Translate("Subscription updated"));
             }
             catch (Exception)
@@ -387,8 +383,9 @@ namespace Netch.Forms
 
         private void AboutToolStripButton_Click(object sender, EventArgs e)
         {
-            new AboutForm().Show();
             Hide();
+            new AboutForm().ShowDialog();
+            Show();
         }
 
         #endregion

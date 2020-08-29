@@ -63,9 +63,6 @@ namespace Netch.Forms
         {
             Configuration.Save();
             Global.Settings.UseProxyToUpdateSubscription = UseSelectedServerCheckBox.Checked;
-
-            Global.MainForm.InitServer();
-            Global.MainForm.Show();
         }
 
         private void CopyLinkToolStripMenuItem_Click(object sender, EventArgs e)
@@ -95,8 +92,6 @@ namespace Netch.Forms
                         Global.Settings.SubscribeLink.RemoveAt(item.Index);
                         SubscribeLinkListView.Items.Remove(item);
                         ResetEditingGroup();
-
-                        Global.MainForm.InitServer();
                     }
                 }
             }
@@ -190,18 +185,18 @@ namespace Netch.Forms
 
         private static void DeleteServersInGroup(string group)
         {
-            Global.Settings.Server = Global.Settings.Server.Where(server => !server.Group.Equals(group)).ToList();
+            Global.Settings.Server.RemoveAll(server => server.Group == group);
         }
 
         private static void RenameServersGroup(string oldGroup, string newGroup)
         {
-            Global.Settings.Server.ForEach(server =>
+            foreach (var server in Global.Settings.Server)
             {
                 if (server.Group == oldGroup)
                 {
                     server.Group = newGroup;
                 }
-            });
+            }
         }
 
         /// <summary>

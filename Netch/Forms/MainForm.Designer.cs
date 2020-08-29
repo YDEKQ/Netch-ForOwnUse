@@ -153,35 +153,35 @@ namespace Netch.Forms
             this.AddSocks5ServerToolStripMenuItem.Name = "AddSocks5ServerToolStripMenuItem";
             this.AddSocks5ServerToolStripMenuItem.Size = new System.Drawing.Size(259, 22);
             this.AddSocks5ServerToolStripMenuItem.Text = "Add [Socks5] Server";
-            this.AddSocks5ServerToolStripMenuItem.Click += new System.EventHandler(this.AddSocks5ServerToolStripMenuItem_Click);
+            this.AddSocks5ServerToolStripMenuItem.Click += new System.EventHandler(this.AddServerToolStripMenuItem_Click);
             // 
             // AddShadowsocksServerToolStripMenuItem
             // 
             this.AddShadowsocksServerToolStripMenuItem.Name = "AddShadowsocksServerToolStripMenuItem";
             this.AddShadowsocksServerToolStripMenuItem.Size = new System.Drawing.Size(259, 22);
             this.AddShadowsocksServerToolStripMenuItem.Text = "Add [Shadowsocks] Server";
-            this.AddShadowsocksServerToolStripMenuItem.Click += new System.EventHandler(this.AddShadowsocksServerToolStripMenuItem_Click);
+            this.AddShadowsocksServerToolStripMenuItem.Click += new System.EventHandler(this.AddServerToolStripMenuItem_Click);
             // 
             // AddShadowsocksRServerToolStripMenuItem
             // 
             this.AddShadowsocksRServerToolStripMenuItem.Name = "AddShadowsocksRServerToolStripMenuItem";
             this.AddShadowsocksRServerToolStripMenuItem.Size = new System.Drawing.Size(259, 22);
             this.AddShadowsocksRServerToolStripMenuItem.Text = "Add [ShadowsocksR] Server";
-            this.AddShadowsocksRServerToolStripMenuItem.Click += new System.EventHandler(this.AddShadowsocksRServerToolStripMenuItem_Click);
+            this.AddShadowsocksRServerToolStripMenuItem.Click += new System.EventHandler(this.AddServerToolStripMenuItem_Click);
             // 
             // AddVMessServerToolStripMenuItem
             // 
             this.AddVMessServerToolStripMenuItem.Name = "AddVMessServerToolStripMenuItem";
             this.AddVMessServerToolStripMenuItem.Size = new System.Drawing.Size(259, 22);
             this.AddVMessServerToolStripMenuItem.Text = "Add [VMess] Server";
-            this.AddVMessServerToolStripMenuItem.Click += new System.EventHandler(this.AddVMessServerToolStripMenuItem_Click);
+            this.AddVMessServerToolStripMenuItem.Click += new System.EventHandler(this.AddServerToolStripMenuItem_Click);
             // 
             // AddTrojanServerToolStripMenuItem
             // 
             this.AddTrojanServerToolStripMenuItem.Name = "AddTrojanServerToolStripMenuItem";
             this.AddTrojanServerToolStripMenuItem.Size = new System.Drawing.Size(259, 22);
             this.AddTrojanServerToolStripMenuItem.Text = "Add [Trojan] Server";
-            this.AddTrojanServerToolStripMenuItem.Click += new System.EventHandler(this.AddTrojanServerToolStripMenuItem_Click);
+            this.AddTrojanServerToolStripMenuItem.Click += new System.EventHandler(this.AddServerToolStripMenuItem_Click);
             // 
             // ModeToolStripMenuItem
             // 
@@ -605,6 +605,7 @@ namespace Netch.Forms
             this.NatTypeStatusLabel.Size = new System.Drawing.Size(36, 17);
             this.NatTypeStatusLabel.Text = "NAT:";
             this.NatTypeStatusLabel.TextAlign = System.Drawing.ContentAlignment.BottomLeft;
+            this.NatTypeStatusLabel.Click += new System.EventHandler(this.NatTypeStatusLabel_Click);
             // 
             // NatTypeStatusLightLabel
             // 
@@ -616,6 +617,7 @@ namespace Netch.Forms
             this.NatTypeStatusLightLabel.Size = new System.Drawing.Size(18, 21);
             this.NatTypeStatusLightLabel.Text = "⬤";
             this.NatTypeStatusLightLabel.TextAlign = System.Drawing.ContentAlignment.BottomCenter;
+            this.NatTypeStatusLightLabel.Click += new System.EventHandler(this.NatTypeStatusLabel_Click);
             // 
             // ControlButton
             // 
@@ -718,7 +720,6 @@ namespace Netch.Forms
             this.Text = "Netch";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
             this.Load += new System.EventHandler(this.MainForm_Load);
-            this.VisibleChanged += new System.EventHandler(this.MainForm_VisibleChanged);
             this.MenuStrip.ResumeLayout(false);
             this.MenuStrip.PerformLayout();
             this.ConfigurationGroupBox.ResumeLayout(false);

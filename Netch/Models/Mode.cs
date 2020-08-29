@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using Netch.Utils;
 
 namespace Netch.Models
 {
@@ -10,6 +12,11 @@ namespace Netch.Models
         ///		备注
         /// </summary>
         public string Remark;
+
+        /// <summary>
+        ///     文件相对路径(必须是存在的文件)
+        /// </summary>
+        public string RelativePath;
 
         /// <summary>
         ///		无后缀文件名
@@ -85,53 +92,6 @@ namespace Netch.Models
             fileString = fileString.Substring(0, fileString.Length - 2);
 
             return fileString;
-        }
-
-        /// <summary>
-        ///		写入模式文件
-        /// </summary>
-        public void ToFile(string Dir)
-        {
-            if (!System.IO.Directory.Exists(Dir))
-            {
-                System.IO.Directory.CreateDirectory(Dir);
-            }
-
-            var NewPath = System.IO.Path.Combine(Dir, FileName);
-            if (System.IO.File.Exists(NewPath + ".txt"))
-            {
-                // 重命名该模式文件名
-                NewPath += "_";
-
-                while (System.IO.File.Exists(NewPath + ".txt"))
-                {
-                    // 循环重命名该模式文件名，直至不重名
-                    NewPath += "_";
-                }
-            }
-
-            FileName = System.IO.Path.GetFileName(NewPath);
-
-            // 加上文件名后缀
-            NewPath += ".txt";
-
-            // 写入到模式文件里
-            System.IO.File.WriteAllText(NewPath, ToFileString());
-        }
-
-        /// <summary>
-        ///		删除模式文件
-        /// </summary>
-        public void DeleteFile(string Dir)
-        {
-            if (System.IO.Directory.Exists(Dir))
-            {
-                var NewPath = System.IO.Path.Combine(Dir, FileName);
-                if (System.IO.File.Exists(NewPath + ".txt"))
-                {
-                    System.IO.File.Delete(NewPath + ".txt");
-                }
-            }
         }
 
         public string TypeToString()

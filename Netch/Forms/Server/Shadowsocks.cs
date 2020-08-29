@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Drawing;
-using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Netch.Utils;
 
@@ -8,21 +7,19 @@ namespace Netch.Forms.Server
 {
     public partial class Shadowsocks : Form
     {
-        public int Index;
+        private readonly Models.Server _server;
 
-        /// <summary>
-        ///     初始化
-        /// </summary>
-        /// <param name="index">需要编辑的索引</param>
-        public Shadowsocks(int index = -1)
+        public Shadowsocks(Models.Server server = default)
         {
             InitializeComponent();
 
-            Index = index;
+            _server = server ?? new Models.Server {EncryptMethod = Global.EncryptMethods.SS[0]};
         }
 
         private void Shadowsocks_Load(object sender, EventArgs e)
         {
+            #region InitText
+
             ConfigurationGroupBox.Text = i18N.Translate(ConfigurationGroupBox.Text);
             RemarkLabel.Text = i18N.Translate(RemarkLabel.Text);
             AddressLabel.Text = i18N.Translate(AddressLabel.Text);
@@ -32,44 +29,32 @@ namespace Netch.Forms.Server
             PluginOptionsLabel.Text = i18N.Translate(PluginOptionsLabel.Text);
             ControlButton.Text = i18N.Translate(ControlButton.Text);
 
-            foreach (var encrypt in Global.EncryptMethods.SS)
-            {
-                EncryptMethodComboBox.Items.Add(encrypt);
-            }
+            EncryptMethodComboBox.Items.AddRange(Global.EncryptMethods.SS.ToArray());
 
-            if (Index != -1)
-            {
-                RemarkTextBox.Text = Global.Settings.Server[Index].Remark;
-                AddressTextBox.Text = Global.Settings.Server[Index].Hostname;
-                PortTextBox.Text = Global.Settings.Server[Index].Port.ToString();
-                PasswordTextBox.Text = Global.Settings.Server[Index].Password;
-                EncryptMethodComboBox.SelectedIndex = Global.EncryptMethods.SS.IndexOf(Global.Settings.Server[Index].EncryptMethod);
-                PluginTextBox.Text = Global.Settings.Server[Index].Plugin;
-                PluginOptionsTextBox.Text = Global.Settings.Server[Index].PluginOption;
-            }
-            else
-            {
-                EncryptMethodComboBox.SelectedIndex = 0;
-            }
-        }
+            #endregion
 
-        private void Shadowsocks_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            Global.MainForm.Show();
+            RemarkTextBox.Text = _server.Remark;
+            AddressTextBox.Text = _server.Hostname;
+            PortTextBox.Text = _server.Port.ToString();
+            PasswordTextBox.Text = _server.Password;
+            EncryptMethodComboBox.SelectedIndex = Global.EncryptMethods.SS.IndexOf(_server.EncryptMethod);
+            PluginTextBox.Text = _server.Plugin;
+            PluginOptionsTextBox.Text = _server.PluginOption;
         }
 
         private void ComboBox_DrawItem(object sender, DrawItemEventArgs e)
         {
-            var cbx = sender as ComboBox;
-            if (cbx != null)
+            if (sender is ComboBox cbx)
             {
                 e.DrawBackground();
 
                 if (e.Index >= 0)
                 {
-                    var sf = new StringFormat();
-                    sf.LineAlignment = StringAlignment.Center;
-                    sf.Alignment = StringAlignment.Center;
+                    var sf = new StringFormat
+                    {
+                        LineAlignment = StringAlignment.Center,
+                        Alignment = StringAlignment.Center
+                    };
 
                     var brush = new SolidBrush(cbx.ForeColor);
 
@@ -85,44 +70,27 @@ namespace Netch.Forms.Server
 
         private void ControlButton_Click(object sender, EventArgs e)
         {
-            if (!Regex.Match(PortTextBox.Text, "^[0-9]+$").Success)
+            if (!int.TryParse(PortTextBox.Text, out var port))
             {
                 return;
             }
-            if (Index == -1)
+
+            _server.Remark = RemarkTextBox.Text;
+            _server.Type = "SS";
+            _server.Hostname = AddressTextBox.Text;
+            _server.Port = port;
+            _server.Password = PasswordTextBox.Text;
+            _server.EncryptMethod = EncryptMethodComboBox.Text;
+            _server.Plugin = PluginTextBox.Text;
+            _server.PluginOption = PluginOptionsTextBox.Text;
+            _server.Country = null;
+
+            if (Global.Settings.Server.IndexOf(_server) == -1)
             {
-                Global.Settings.Server.Add(new Models.Server
-                {
-                    Remark = RemarkTextBox.Text,
-                    Type = "SS",
-                    Hostname = AddressTextBox.Text,
-                    Port = int.Parse(PortTextBox.Text),
-                    Password = PasswordTextBox.Text,
-                    EncryptMethod = EncryptMethodComboBox.Text,
-                    Plugin = PluginTextBox.Text,
-                    PluginOption = PluginOptionsTextBox.Text
-                });
-            }
-            else
-            {
-                Global.Settings.Server[Index] = new Models.Server
-                {
-                    Remark = RemarkTextBox.Text,
-                    Group = Global.Settings.Server[Index].Group,
-                    Type = "SS",
-                    Hostname = AddressTextBox.Text,
-                    Port = int.Parse(PortTextBox.Text),
-                    Password = PasswordTextBox.Text,
-                    EncryptMethod = EncryptMethodComboBox.Text,
-                    Plugin = PluginTextBox.Text,
-                    PluginOption = PluginOptionsTextBox.Text,
-                    Country = null
-                };
+                Global.Settings.Server.Add(_server);
             }
 
-            Configuration.Save();
             MessageBoxX.Show(i18N.Translate("Saved"));
-            Global.MainForm.InitServer();
             Close();
         }
     }

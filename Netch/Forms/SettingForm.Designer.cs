@@ -68,7 +68,7 @@
             this.TcpingAtStartedCheckBox = new System.Windows.Forms.CheckBox();
             this.STUNServerLabel = new System.Windows.Forms.Label();
             this.RunAtStartupCheckBox = new System.Windows.Forms.CheckBox();
-            this.STUN_ServerComboBox = new System.Windows.Forms.SearchComboBox();
+            this.STUN_ServerComboBox = new System.Windows.Forms.ComboBox();
             this.MinimizeWhenStartedCheckBox = new System.Windows.Forms.CheckBox();
             this.ProfileCountLabel = new System.Windows.Forms.Label();
             this.ProfileCountTextBox = new System.Windows.Forms.TextBox();
@@ -596,7 +596,6 @@
             this.Name = "SettingForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Settings";
-            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.SettingForm_FormClosing);
             this.Load += new System.EventHandler(this.SettingForm_Load);
             this.PortGroupBox.ResumeLayout(false);
             this.PortGroupBox.PerformLayout();
@@ -637,7 +636,7 @@
         private System.Windows.Forms.CheckBox MinimizeWhenStartedCheckBox;
         private System.Windows.Forms.CheckBox RunAtStartupCheckBox;
         private System.Windows.Forms.Label STUNServerLabel;
-        private System.Windows.Forms.SearchComboBox STUN_ServerComboBox;
+        private System.Windows.Forms.ComboBox STUN_ServerComboBox;
         private System.Windows.Forms.CheckBox ProxyDNSCheckBox;
         private System.Windows.Forms.TextBox DetectionIntervalTextBox;
         private System.Windows.Forms.CheckBox TcpingAtStartedCheckBox;

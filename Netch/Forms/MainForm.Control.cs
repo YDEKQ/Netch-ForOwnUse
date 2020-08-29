@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -18,6 +19,7 @@ namespace Netch.Forms
 
         private async void ControlFun()
         {
+            Configuration.Save();
             if (State == State.Waiting || State == State.Stopped)
             {
                 // 服务器、模式 需选择
@@ -68,8 +70,8 @@ namespace Netch.Forms
                             while (State == State.Started)
                             {
                                 server.Test();
-                                // 重载服务器列表
-                                InitServer();
+                                // 重绘 ServerComboBox
+                                ServerComboBox.Invalidate();
 
                                 Thread.Sleep(Global.Settings.StartedTcping_Interval * 1000);
                             }
@@ -92,11 +94,11 @@ namespace Netch.Forms
             }
         }
 
-        public void OnBandwidthUpdated(long download)
+        public void OnBandwidthUpdated(ulong download)
         {
             if (InvokeRequired)
             {
-                BeginInvoke(new Action<long>(OnBandwidthUpdated), download);
+                BeginInvoke(new Action<ulong>(OnBandwidthUpdated), download);
                 return;
             }
 
@@ -116,44 +118,14 @@ namespace Netch.Forms
             }
         }
 
-        public void OnBandwidthUpdated(long upload, long download)
-        {
-            if (InvokeRequired)
-            {
-                BeginInvoke(new Action<long, long>(OnBandwidthUpdated), upload, download);
-                return;
-            }
-
-            try
-            {
-                if (upload < 1 || download < 1)
-                {
-                    return;
-                }
-
-                UsedBandwidthLabel.Text =
-                    $"{i18N.Translate("Used", ": ")}{Bandwidth.Compute(upload + download)}";
-                UploadSpeedLabel.Text = $"↑: {Bandwidth.Compute(upload - LastUploadBandwidth)}/s";
-                DownloadSpeedLabel.Text = $"↓: {Bandwidth.Compute(download - LastDownloadBandwidth)}/s";
-
-                LastUploadBandwidth = upload;
-                LastDownloadBandwidth = download;
-                Refresh();
-            }
-            catch
-            {
-                // ignored
-            }
-        }
-
         /// <summary>
         ///     上一次上传的流量
         /// </summary>
-        public long LastUploadBandwidth;
+        public ulong LastUploadBandwidth;
 
         /// <summary>
         ///     上一次下载的流量
         /// </summary>
-        public long LastDownloadBandwidth;
+        public ulong LastDownloadBandwidth;
     }
 }
