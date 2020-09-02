@@ -134,3 +134,5 @@ Netch 支持多种语言，在启动时会根据系统语言选择自身语言�
 -   [Privoxy](https://www.privoxy.org/)
 -   [NatTypeTester](https://github.com/HMBSbige/NatTypeTester)
 -   [NetFilter SDK](https://netfiltersdk.com/)
+
+[![Stargazers over time](https://starchart.cc/AmazingDM/Netch-ForOwnUse.svg)](https://starchart.cc/AmazingDM/Netch-ForOwnUse)     
