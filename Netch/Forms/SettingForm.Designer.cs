@@ -54,6 +54,7 @@
             this.BehaviorGroupBox = new System.Windows.Forms.GroupBox();
             this.PrintProxyIPCheckBox = new System.Windows.Forms.CheckBox();
             this.ProcessNoProxyForUdpcheckBox = new System.Windows.Forms.CheckBox();
+            this.UpdateSubscribeatWhenOpenedCheckBox = new System.Windows.Forms.CheckBox();
             this.LanguageLabel = new System.Windows.Forms.Label();
             this.LanguageComboBox = new System.Windows.Forms.ComboBox();
             this.UDPServerCheckBox = new System.Windows.Forms.CheckBox();
@@ -281,7 +282,7 @@
             // 
             // ControlButton
             // 
-            this.ControlButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
+            this.ControlButton.Anchor = ((System.Windows.Forms.AnchorStyles) ((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.ControlButton.Location = new System.Drawing.Point(978, 356);
             this.ControlButton.Name = "ControlButton";
             this.ControlButton.Size = new System.Drawing.Size(75, 23);
@@ -305,6 +306,7 @@
             // 
             this.BehaviorGroupBox.Controls.Add(this.PrintProxyIPCheckBox);
             this.BehaviorGroupBox.Controls.Add(this.ProcessNoProxyForUdpcheckBox);
+            this.BehaviorGroupBox.Controls.Add(this.UpdateSubscribeatWhenOpenedCheckBox);
             this.BehaviorGroupBox.Controls.Add(this.LanguageLabel);
             this.BehaviorGroupBox.Controls.Add(this.LanguageComboBox);
             this.BehaviorGroupBox.Controls.Add(this.UDPServerCheckBox);
@@ -355,6 +357,17 @@
             this.ProcessNoProxyForUdpcheckBox.Text = "进程模式不代理UDP";
             this.ProcessNoProxyForUdpcheckBox.UseVisualStyleBackColor = true;
             // 
+            // UpdateSubscribeatWhenOpenedCheckBox
+            // 
+            this.UpdateSubscribeatWhenOpenedCheckBox.AutoSize = true;
+            this.UpdateSubscribeatWhenOpenedCheckBox.Location = new System.Drawing.Point(206, 129);
+            this.UpdateSubscribeatWhenOpenedCheckBox.Name = "UpdateSubscribeatWhenOpenedCheckBox";
+            this.UpdateSubscribeatWhenOpenedCheckBox.Size = new System.Drawing.Size(224, 21);
+            this.UpdateSubscribeatWhenOpenedCheckBox.TabIndex = 24;
+            this.UpdateSubscribeatWhenOpenedCheckBox.Text = "Update subscribeat when opened";
+            this.UpdateSubscribeatWhenOpenedCheckBox.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+            this.UpdateSubscribeatWhenOpenedCheckBox.UseVisualStyleBackColor = true;
+            // 
             // LanguageLabel
             // 
             this.LanguageLabel.AutoSize = true;
@@ -376,11 +389,11 @@
             // UDPServerCheckBox
             // 
             this.UDPServerCheckBox.AutoSize = true;
-            this.UDPServerCheckBox.Location = new System.Drawing.Point(206, 129);
+            this.UDPServerCheckBox.Location = new System.Drawing.Point(12, 154);
             this.UDPServerCheckBox.Name = "UDPServerCheckBox";
-            this.UDPServerCheckBox.Size = new System.Drawing.Size(148, 21);
+            this.UDPServerCheckBox.Size = new System.Drawing.Size(76, 21);
             this.UDPServerCheckBox.TabIndex = 24;
-            this.UDPServerCheckBox.Text = "神秘开关（UDP分流）";
+            this.UDPServerCheckBox.Text = "UDP分流";
             this.UDPServerCheckBox.UseVisualStyleBackColor = true;
             this.UDPServerCheckBox.CheckedChanged += new System.EventHandler(this.UDPServerCheckBox_CheckedChanged);
             // 
@@ -388,7 +401,7 @@
             // 
             this.UDPServerComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.UDPServerComboBox.FormattingEnabled = true;
-            this.UDPServerComboBox.Location = new System.Drawing.Point(12, 156);
+            this.UDPServerComboBox.Location = new System.Drawing.Point(120, 152);
             this.UDPServerComboBox.Name = "UDPServerComboBox";
             this.UDPServerComboBox.Size = new System.Drawing.Size(423, 25);
             this.UDPServerComboBox.TabIndex = 23;
@@ -656,5 +669,6 @@
         private System.Windows.Forms.CheckBox PrintProxyIPCheckBox;
         private System.Windows.Forms.CheckBox ModifySystemDNSCheckBox;
         private System.Windows.Forms.CheckBox CheckBetaUpdateCheckBox;
+        private System.Windows.Forms.CheckBox UpdateSubscribeatWhenOpenedCheckBox;
     }
 }

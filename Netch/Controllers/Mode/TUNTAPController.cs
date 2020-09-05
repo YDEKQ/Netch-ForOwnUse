@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -77,12 +78,6 @@ namespace Netch.Controllers
             Logging.Info("绕行 → 服务器 IP");
             _directIPs.AddRange(_serverAddresses.Where(address => !IPAddress.IsLoopback(address)).Select(address => IPNetwork.Parse(address.ToString(), 32)));
 
-            if (_savedMode.BypassChina)
-            {
-                Logging.Info("绕行 → 中国 IP");
-                _directIPs.AddRange(Encoding.UTF8.GetString(Resources.CNIP).Split('\n').Select(IPNetwork.Parse));
-            }
-
             Logging.Info("绕行 → 局域网 IP");
             _directIPs.AddRange(_bypassLanIPs.Select(IPNetwork.Parse));
 
@@ -146,6 +141,19 @@ namespace Netch.Controllers
                         }
                     );
 
+                    if (_savedMode.BypassChina)
+                    {
+                        Logging.Info("绕行 → 中国 IP");
+
+                        foreach (var str in File.ReadAllLines("bin\\china_ip_list", Encoding.UTF8))
+                        {
+                            if (IPNetwork.TryParse(str, out var entry))
+                            {
+                                _directIPs.Add(entry);
+                            }
+                        }
+                    }
+
                     Logging.Info("绕行 → 规则 IP");
                     _directIPs.AddRange(_savedMode.Rule.Select(IPNetwork.Parse));
 
@@ -204,14 +212,7 @@ namespace Netch.Controllers
             //if (Global.Settings.TUNTAP.UseCustomDNS || server.Type.Equals("VMess"))
             if (Global.Settings.TUNTAP.UseCustomDNS)
             {
-                dns = string.Empty;
-                foreach (var value in Global.Settings.TUNTAP.DNS)
-                {
-                    dns += value;
-                    dns += ',';
-                }
-
-                dns = dns.Trim();
+                dns = Global.Settings.TUNTAP.DNS.Aggregate(string.Empty, (current, value) => current + (value + ',')).Trim();
                 dns = dns.Substring(0, dns.Length - 1);
             }
             else
@@ -231,8 +232,7 @@ namespace Netch.Controllers
             argument.Append($"-tunAddr {Global.Settings.TUNTAP.Address} -tunMask {Global.Settings.TUNTAP.Netmask} -tunGw {Global.Settings.TUNTAP.Gateway} -tunDns {dns} -tunName \"{adapterName}\"");
 
             State = State.Starting;
-            if (!StartInstanceAuto(argument.ToString(), ProcessPriorityClass.RealTime)) return false;
-            return true;
+            return StartInstanceAuto(argument.ToString(), ProcessPriorityClass.RealTime);
         }
 
         /// <summary>
@@ -358,9 +358,12 @@ namespace Netch.Controllers
             Delete
         }
 
-        private static bool RouteAction(Action action, IEnumerable<IPNetwork> ipNetworks, RouteType routeType, int metric = 0)
+        private static void RouteAction(Action action, IEnumerable<IPNetwork> ipNetworks, RouteType routeType, int metric = 0)
         {
-            return ipNetworks.All(address => RouteAction(action, address, routeType, metric));
+            foreach (var address in ipNetworks)
+            {
+                RouteAction(action, address, routeType, metric);
+            }
         }
 
         private static bool RouteAction(Action action, string address, byte cidr, RouteType routeType, int metric = 0)
@@ -386,12 +389,19 @@ namespace Netch.Controllers
                     throw new ArgumentOutOfRangeException(nameof(routeType), routeType, null);
             }
 
-            return action switch
+            var result = action switch
             {
                 Action.Create => NativeMethods.CreateRoute(ipNetwork.Network.ToString(), ipNetwork.Cidr, gateway, index, metric),
                 Action.Delete => NativeMethods.DeleteRoute(ipNetwork.Network.ToString(), ipNetwork.Cidr, gateway, index, metric),
                 _ => throw new ArgumentOutOfRangeException(nameof(action), action, null)
             };
+
+            if (!result)
+            {
+                Logging.Warning($"{action} Route on {routeType} Adapter failed: {ipNetwork} metric {metric}");
+            }
+
+            return result;
         }
     }
 }

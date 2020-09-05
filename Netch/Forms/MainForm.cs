@@ -16,10 +16,6 @@ namespace Netch.Forms
 {
     public partial class MainForm : Form
     {
-        /// <summary>
-        ///     主控制器
-        /// </summary>
-        private MainController _mainController = new MainController();
 
         public MainForm()
         {
@@ -85,6 +81,16 @@ namespace Netch.Forms
                 if (Global.Settings.CheckUpdateWhenOpened)
                 {
                     CheckUpdate();
+                }
+            });
+
+
+            Task.Run(() =>
+            {
+                // 检查订阅更新
+                if (Global.Settings.UpdateSubscribeatWhenOpened)
+                {
+                    UpdateServersFromSubscribe();
                 }
             });
         }
@@ -444,10 +450,9 @@ namespace Netch.Forms
 
         private void NatTypeStatusLabel_Click(object sender, EventArgs e)
         {
-            //一个不太优雅的🔒
-            if (_state == State.Started && NatTypeStatusLabel.ToString().Contains("["))
+            if (_state == State.Started && MainController.NttTested)
             {
-                _mainController.RetryNatTest();
+                MainController.NatTest();
             }
         }
     }

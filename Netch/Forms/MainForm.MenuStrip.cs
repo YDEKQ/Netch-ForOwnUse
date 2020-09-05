@@ -52,7 +52,7 @@ namespace Netch.Forms
 
         private void AddServerToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            Form form = ((ToolStripMenuItem) sender).Name switch
+            Form form = ((ToolStripMenuItem)sender).Name switch
             {
                 "AddSocks5ServerToolStripMenuItem" => new Socks5(),
                 "AddShadowsocksServerToolStripMenuItem" => new Shadowsocks(),
@@ -113,6 +113,12 @@ namespace Netch.Forms
 
         private async void UpdateServersFromSubscribeLinksToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            UpdateServersFromSubscribe();
+        }
+
+        public async void UpdateServersFromSubscribe()
+        {
+
             void DisableItems(bool v)
             {
                 MenuStrip.Enabled = ConfigurationGroupBox.Enabled = ProfileGroupBox.Enabled = ControlButton.Enabled = v;
@@ -144,7 +150,7 @@ namespace Netch.Forms
                         Remark = "ProxyUpdate",
                         Type = 5
                     };
-                    await _mainController.Start(ServerComboBox.SelectedItem as Models.Server, mode);
+                    await MainController.Start(ServerComboBox.SelectedItem as Models.Server, mode);
                 }
 
                 var serverLock = new object();
@@ -209,7 +215,7 @@ namespace Netch.Forms
             {
                 if (Global.Settings.UseProxyToUpdateSubscription)
                 {
-                    await _mainController.Stop();
+                    await MainController.Stop();
                 }
 
                 DisableItems(true);
@@ -297,7 +303,7 @@ namespace Netch.Forms
                         Type = 5
                     };
                     State = State.Starting;
-                    await _mainController.Start(ServerComboBox.SelectedItem as Models.Server, mode);
+                    await MainController.Start(ServerComboBox.SelectedItem as Models.Server, mode);
                 }
 
                 var req = WebUtil.CreateRequest(Global.Settings.ACL);
@@ -316,7 +322,7 @@ namespace Netch.Forms
             {
                 if (useProxy)
                 {
-                    await _mainController.Stop();
+                    await MainController.Stop();
                     State = State.Stopped;
                 }
 
