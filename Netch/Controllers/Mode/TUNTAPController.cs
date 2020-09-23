@@ -5,13 +5,11 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Netch.Models;
-using Netch.Properties;
 using Netch.Utils;
 
 namespace Netch.Controllers
@@ -19,7 +17,8 @@ namespace Netch.Controllers
     public class TUNTAPController : ModeController
     {
         // ByPassLan IP
-        private readonly List<string> _bypassLanIPs = new List<string> {"10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16"};
+        private readonly List<string> _bypassLanIPs = new List<string>
+            {"10.0.0.0/8", "172.16.0.0/16", "192.168.0.0/16"};
 
         private Mode _savedMode = new Mode();
         private Server _savedServer = new Server();
@@ -57,7 +56,7 @@ namespace Netch.Controllers
             }
 
             // 搜索出口
-            return SearchAdapters();
+            return SearchTapAdapter();
         }
 
         private readonly List<IPNetwork> _directIPs = new List<IPNetwork>();
@@ -76,7 +75,8 @@ namespace Netch.Controllers
             _directIPs.AddRange(Global.Settings.BypassIPs.Select(IPNetwork.Parse));
 
             Logging.Info("绕行 → 服务器 IP");
-            _directIPs.AddRange(_serverAddresses.Where(address => !IPAddress.IsLoopback(address)).Select(address => IPNetwork.Parse(address.ToString(), 32)));
+            _directIPs.AddRange(_serverAddresses.Where(address => !IPAddress.IsLoopback(address))
+                .Select(address => IPNetwork.Parse(address.ToString(), 32)));
 
             Logging.Info("绕行 → 局域网 IP");
             _directIPs.AddRange(_bypassLanIPs.Select(IPNetwork.Parse));
@@ -122,7 +122,9 @@ namespace Netch.Controllers
                         }
                         else
                         {
-                            _proxyIPs.AddRange(new[] {"1.1.1.1", "8.8.8.8", "9.9.9.9", "185.222.222.222"}.Select(ip => IPNetwork.Parse(ip, 32)));
+                            _proxyIPs.AddRange(
+                                new[] {"1.1.1.1", "8.8.8.8", "9.9.9.9", "185.222.222.222"}.Select(ip =>
+                                    IPNetwork.Parse(ip, 32)));
                         }
                     }
 
@@ -178,7 +180,7 @@ namespace Netch.Controllers
         /// <summary>
         ///     清除绕行规则
         /// </summary>
-        private bool ClearBypass()
+        private bool ClearRouteTable()
         {
             switch (_savedMode.Type)
             {
@@ -208,20 +210,23 @@ namespace Netch.Controllers
             var adapterName = TUNTAP.GetName(Global.TUNTAP.ComponentID);
 
             string dns;
-            //V2ray使用Unbound本地DNS会导致查询异常缓慢故此V2ray不启动unbound而是使用自定义DNS
-            //if (Global.Settings.TUNTAP.UseCustomDNS || server.Type.Equals("VMess"))
             if (Global.Settings.TUNTAP.UseCustomDNS)
             {
-                dns = Global.Settings.TUNTAP.DNS.Aggregate(string.Empty, (current, value) => current + (value + ',')).Trim();
-                dns = dns.Substring(0, dns.Length - 1);
+                if (Global.Settings.TUNTAP.DNS.Any())
+                {
+                    dns = Global.Settings.TUNTAP.DNS.Aggregate((current, ip) => $"{current},{ip}");
+                }
+                else
+                {
+                    Global.Settings.TUNTAP.DNS.Add("1.1.1.1");
+                    dns = "1.1.1.1";
+                }
             }
             else
             {
-                pDNSController.Start();
+                var _ = pDNSController.Start();
                 dns = "127.0.0.1";
             }
-
-            if (Global.Settings.TUNTAP.UseFakeDNS) dns += " -fakeDns";
 
             var argument = new StringBuilder();
             if (server.Type == "Socks5")
@@ -229,9 +234,12 @@ namespace Netch.Controllers
             else
                 argument.Append($"-proxyServer 127.0.0.1:{Global.Settings.Socks5LocalPort} ");
 
-            argument.Append($"-tunAddr {Global.Settings.TUNTAP.Address} -tunMask {Global.Settings.TUNTAP.Netmask} -tunGw {Global.Settings.TUNTAP.Gateway} -tunDns {dns} -tunName \"{adapterName}\"");
+            argument.Append(
+                $"-tunAddr {Global.Settings.TUNTAP.Address} -tunMask {Global.Settings.TUNTAP.Netmask} -tunGw {Global.Settings.TUNTAP.Gateway} -tunDns {dns} -tunName \"{adapterName}\" ");
 
-            State = State.Starting;
+            if (Global.Settings.TUNTAP.UseFakeDNS && Global.SupportFakeDns)
+                argument.Append("-fakeDns ");
+
             return StartInstanceAuto(argument.ToString(), ProcessPriorityClass.RealTime);
         }
 
@@ -243,31 +251,57 @@ namespace Netch.Controllers
             var tasks = new[]
             {
                 Task.Factory.StartNew(StopInstance),
-                Task.Factory.StartNew(ClearBypass),
+                Task.Factory.StartNew(ClearRouteTable),
                 Task.Factory.StartNew(pDNSController.Stop)
             };
             Task.WaitAll(tasks);
         }
 
+        public bool TestFakeDNS()
+        {
+            var exited = false;
+            var helpStr = new StringBuilder();
+            try
+            {
+                void OnOutputDataReceived(object sender,DataReceivedEventArgs e)
+                {
+                    if (e.Data == null)
+                    {
+                        exited = true;
+                        return;
+                    }
+                    helpStr.Append(e.Data);
+                }
+                InitInstance("-h");
+                // Instance.OutputDataReceived += OnOutputDataReceived;
+                Instance.ErrorDataReceived += OnOutputDataReceived;
+                Instance.Start();
+                Instance.BeginOutputReadLine();
+                Instance.BeginErrorReadLine();
+                while (!exited)
+                {
+                    Thread.Sleep(200);
+                }
+
+                return helpStr.ToString().Contains("-fakeDns");
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         /// <summary>
         ///     搜索出口和TUNTAP适配器
         /// </summary>
-        private static bool SearchAdapters()
+        public static bool SearchTapAdapter()
         {
-            // 寻找出口适配器
-            if (Win32Native.GetBestRoute(BitConverter.ToUInt32(IPAddress.Parse("114.114.114.114").GetAddressBytes(), 0), 0, out var pRoute) != 0)
-            {
-                Logging.Error("GetBestRoute 搜索失败(找不到出口适配器)");
-                return false;
-            }
-
-            Global.Adapter.Index = pRoute.dwForwardIfIndex;
-
             // 搜索 TUN/TAP 适配器的索引
             if (string.IsNullOrEmpty(Global.TUNTAP.ComponentID = TUNTAP.GetComponentID()))
             {
                 Logging.Info("找不到 TAP 适配器");
-                if (MessageBoxX.Show(i18N.Translate("TUN/TAP driver is not detected. Is it installed now?"), confirm: true) == DialogResult.OK)
+                if (MessageBoxX.Show(i18N.Translate("TUN/TAP driver is not detected. Is it installed now?"),
+                    confirm: true) == DialogResult.OK)
                 {
                     Configuration.addtap();
                     // 给点时间，不然立马安装完毕就查找适配器可能会导致找不到适配器ID
@@ -285,42 +319,14 @@ namespace Netch.Controllers
                 }
             }
 
-            // 根据 IP Index 寻找 出口适配器
-            var errorAdaptersId = new List<string>();
-            try
-            {
-                var adapter = NetworkInterface.GetAllNetworkInterfaces().First(_ =>
-                {
-                    try
-                    {
-                        return _.GetIPProperties().GetIPv4Properties().Index == Global.Adapter.Index;
-                    }
-                    catch (NetworkInformationException)
-                    {
-                        errorAdaptersId.Add(_.Id);
-                        return false;
-                    }
-                });
-                Global.Adapter.Address = adapter.GetIPProperties().UnicastAddresses.First(ip => ip.Address.AddressFamily == AddressFamily.InterNetwork).Address;
-                Global.Adapter.Gateway = new IPAddress(pRoute.dwForwardNextHop);
-                Logging.Info($"出口 IPv4 地址：{Global.Adapter.Address}");
-                Logging.Info($"出口 网关 地址：{Global.Adapter.Gateway}");
-                Logging.Info($"出口适配器：{adapter.Name} {adapter.Id} {adapter.Description}, index: {Global.Adapter.Index}");
-            }
-            catch (Exception e)
-            {
-                Logging.Error($"找不到 IP Index 为 {Global.Adapter.Index} 的出口适配器: {e.Message}");
-                PrintAdapters();
-                return false;
-            }
-
             // 根据 ComponentID 寻找 Tap适配器
             try
             {
                 var adapter = NetworkInterface.GetAllNetworkInterfaces().First(_ => _.Id == Global.TUNTAP.ComponentID);
                 Global.TUNTAP.Adapter = adapter;
                 Global.TUNTAP.Index = adapter.GetIPProperties().GetIPv4Properties().Index;
-                Logging.Info($"TAP 适配器：{adapter.Name} {adapter.Id} {adapter.Description}, index: {Global.TUNTAP.Index}");
+                Logging.Info(
+                    $"TAP 适配器：{adapter.Name} {adapter.Id} {adapter.Description}, index: {Global.TUNTAP.Index}");
             }
             catch (Exception e)
             {
@@ -331,18 +337,10 @@ namespace Netch.Controllers
                     _ => $"Tap 适配器其他异常: {e}"
                 };
                 Logging.Error(msg);
-                PrintAdapters();
                 return false;
             }
 
             return true;
-
-            void PrintAdapters()
-            {
-                Logging.Info("所有适配器:\n" +
-                             NetworkInterface.GetAllNetworkInterfaces().Aggregate(string.Empty, (current, adapter)
-                                 => current + $"{ /*如果加了 ’*‘ 代表遍历中出现异常的适配器  */(errorAdaptersId.Contains(adapter.Id) ? "*" : "")}{adapter.Name} {adapter.Id} {adapter.Description}{Global.EOF}"));
-            }
         }
 
 
@@ -358,7 +356,8 @@ namespace Netch.Controllers
             Delete
         }
 
-        private static void RouteAction(Action action, IEnumerable<IPNetwork> ipNetworks, RouteType routeType, int metric = 0)
+        private static void RouteAction(Action action, IEnumerable<IPNetwork> ipNetworks, RouteType routeType,
+            int metric = 0)
         {
             foreach (var address in ipNetworks)
             {
@@ -378,8 +377,8 @@ namespace Netch.Controllers
             switch (routeType)
             {
                 case RouteType.Gateway:
-                    gateway = Global.Adapter.Gateway.ToString();
-                    index = Global.Adapter.Index;
+                    gateway = Global.Outbound.Gateway.ToString();
+                    index = Global.Outbound.Index;
                     break;
                 case RouteType.TUNTAP:
                     gateway = Global.Settings.TUNTAP.Gateway;
@@ -391,8 +390,10 @@ namespace Netch.Controllers
 
             var result = action switch
             {
-                Action.Create => NativeMethods.CreateRoute(ipNetwork.Network.ToString(), ipNetwork.Cidr, gateway, index, metric),
-                Action.Delete => NativeMethods.DeleteRoute(ipNetwork.Network.ToString(), ipNetwork.Cidr, gateway, index, metric),
+                Action.Create => NativeMethods.CreateRoute(ipNetwork.Network.ToString(), ipNetwork.Cidr, gateway, index,
+                    metric),
+                Action.Delete => NativeMethods.DeleteRoute(ipNetwork.Network.ToString(), ipNetwork.Cidr, gateway, index,
+                    metric),
                 _ => throw new ArgumentOutOfRangeException(nameof(action), action, null)
             };
 

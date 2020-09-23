@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -23,6 +22,18 @@ namespace Netch.Forms
 
             // 监听电源事件
             SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
+
+            ModeComboBox.KeyUp += (sender, args) =>
+            {
+                switch (args.KeyData)
+                {
+                    case Keys.Escape:
+                    {
+                        SelectLastMode();
+                        return;
+                    }
+                }
+            };
 
             CheckForIllegalCrossThreadCalls = false;
         }
@@ -85,12 +96,12 @@ namespace Netch.Forms
             });
 
 
-            Task.Run(() =>
+            Task.Run(async () =>
             {
                 // 检查订阅更新
                 if (Global.Settings.UpdateSubscribeatWhenOpened)
                 {
-                    UpdateServersFromSubscribe();
+                    await UpdateServersFromSubscribe();
                 }
             });
         }
@@ -190,6 +201,7 @@ namespace Netch.Forms
             CheckForUpdatesToolStripMenuItem.Text = i18N.Translate("Check for updates");
             OpenDirectoryToolStripMenuItem.Text = i18N.Translate("Open Directory");
             AboutToolStripButton.Text = i18N.Translate("About");
+            fAQToolStripMenuItem.Text = i18N.Translate("FAQ");
             NewVersionLabel.Text = i18N.Translate("New version available");
             // VersionLabel.Text = i18N.Translate("xxx");
             exitToolStripMenuItem.Text = i18N.Translate("Exit");
@@ -341,7 +353,7 @@ namespace Netch.Forms
             }
 
             var selectedMode = (Models.Mode) ModeComboBox.SelectedItem;
-            this.ModeComboBox.Items.Remove(selectedMode);
+            ModeComboBox.Items.Remove(selectedMode);
             Modes.Delete(selectedMode);
 
             SelectLastMode();
@@ -434,12 +446,19 @@ namespace Netch.Forms
 
         #endregion
 
-        private bool _comboBoxInitialized = false;
+        private bool _comboBoxInitialized;
 
         private void ModeComboBox_SelectedIndexChanged(object sender, EventArgs o)
         {
             if (!_comboBoxInitialized) return;
-            Global.Settings.ModeComboBoxSelectedIndex = ModeComboBox.SelectedIndex;
+            try
+            {
+                Global.Settings.ModeComboBoxSelectedIndex = Global.Modes.IndexOf((Models.Mode) ModeComboBox.SelectedItem);
+            }
+            catch
+            {
+                Global.Settings.ModeComboBoxSelectedIndex = 0;
+            }
         }
 
         private void ServerComboBox_SelectedIndexChanged(object sender, EventArgs o)

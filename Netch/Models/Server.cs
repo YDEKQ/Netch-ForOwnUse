@@ -1,8 +1,6 @@
-﻿using MaxMind.GeoIP2;
-using Netch.Utils;
-using System;
-using System.Net;
+﻿using System;
 using System.Threading.Tasks;
+using Netch.Utils;
 
 namespace Netch.Models
 {
@@ -217,7 +215,7 @@ namespace Netch.Models
         {
             try
             {
-                var destination = Utils.DNS.Lookup(Hostname);
+                var destination = DNS.Lookup(Hostname);
                 if (destination == null)
                 {
                     return Delay = -2;

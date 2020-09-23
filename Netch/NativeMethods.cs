@@ -2,6 +2,18 @@
 
 namespace Netch
 {
+    public enum NameList : int
+    {
+        TYPE_FILTERLOOPBACK,
+        TYPE_FILTERTCP,
+        TYPE_FILTERUDP,
+        TYPE_TCPHOST,
+        TYPE_UDPHOST,
+        TYPE_ADDNAME,
+        TYPE_BYPNAME,
+        TYPE_CLRNAME
+    }
+
     public static class NativeMethods
     {
         /// <summary>
@@ -13,7 +25,7 @@ namespace Netch
         /// <param name="index">适配器索引</param>
         /// <param name="metric">跃点数</param>
         /// <returns>是否成功</returns>
-        [DllImport("bin\\NetchCore", CallingConvention = CallingConvention.Cdecl, EntryPoint = "CreateRoute")]
+        [DllImport("NetchCore", CallingConvention = CallingConvention.Cdecl, EntryPoint = "CreateRoute")]
         public static extern bool CreateRoute(string address, int cidr, string gateway, int index, int metric = 0);
 
         /// <summary>
@@ -25,14 +37,14 @@ namespace Netch
         /// <param name="index">适配器索引</param>
         /// <param name="metric">跃点数</param>
         /// <returns>是否成功</returns>
-        [DllImport("bin\\NetchCore", CallingConvention = CallingConvention.Cdecl, EntryPoint = "DeleteRoute")]
+        [DllImport("NetchCore", CallingConvention = CallingConvention.Cdecl, EntryPoint = "DeleteRoute")]
         public static extern bool DeleteRoute(string address, int cidr, string gateway, int index, int metric = 0);
 
         /// <summary>
         ///     设置直连
         /// </summary>
         /// <returns>是否成功</returns>
-        [DllImport("bin\\sysproxy", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("sysproxy", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool SetDIRECT();
 
         /// <summary>
@@ -41,7 +53,7 @@ namespace Netch
         /// <param name="remote">地址</param>
         /// <param name="bypass">绕过</param>
         /// <returns>是否成功</returns>
-        [DllImport("bin\\sysproxy", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("sysproxy", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool SetGlobal([MarshalAs(UnmanagedType.LPTStr)] string remote, [MarshalAs(UnmanagedType.LPTStr)] string bypass);
 
         /// <summary>
@@ -49,17 +61,22 @@ namespace Netch
         /// </summary>
         /// <param name="remote">URL</param>
         /// <returns>是否成功</returns>
-        [DllImport("bin\\sysproxy", CallingConvention = CallingConvention.Cdecl)]
+        [DllImport("sysproxy", CallingConvention = CallingConvention.Cdecl)]
         public static extern bool SetURL([MarshalAs(UnmanagedType.LPTStr)] string remote);
 
         public class Shadowsocks
         {
-            [DllImport("bin\\shadowsocks-windows-dynamic", CallingConvention = CallingConvention.Cdecl)]
+            [DllImport("shadowsocks-windows-dynamic", CallingConvention = CallingConvention.Cdecl)]
             public static extern bool Info(byte[] client, byte[] remote, byte[] passwd, byte[] method);
-            [DllImport("bin\\shadowsocks-windows-dynamic", CallingConvention = CallingConvention.Cdecl)]
+
+            [DllImport("shadowsocks-windows-dynamic", CallingConvention = CallingConvention.Cdecl)]
             public static extern bool Start();
-            [DllImport("bin\\shadowsocks-windows-dynamic", CallingConvention = CallingConvention.Cdecl)]
+
+            [DllImport("shadowsocks-windows-dynamic", CallingConvention = CallingConvention.Cdecl)]
             public static extern void Stop();
         }
+
+        [DllImport("dnsapi", EntryPoint = "DnsFlushResolverCache")]
+        public static extern uint FlushDNSResolverCache();
     }
 }

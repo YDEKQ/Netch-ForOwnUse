@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Drawing;
-using System.Threading;
-using System.Windows;
+using System.Text;
 using Netch.Controllers;
 using Netch.Models;
 using Netch.Utils;
@@ -24,13 +23,6 @@ namespace Netch.Forms
             get => _state;
             private set
             {
-                if (InvokeRequired)
-                {
-                    // TODO:使所有 State 赋值不在线程中执行然后移除此代码块
-                    BeginInvoke(new Action(() => { State = value; }));
-                    return;
-                }
-
                 void StartDisableItems(bool enabled)
                 {
                     ServerComboBox.Enabled =
@@ -69,7 +61,7 @@ namespace Netch.Forms
                         ControlButton.Enabled = true;
                         ControlButton.Text = i18N.Translate("Stop");
 
-                        StatusTextAppend(MainController.PortInfo);
+                        StatusTextAppend(StatusPortInfoText.Value);
 
                         ProfileGroupBox.Enabled = true;
 
@@ -119,16 +111,9 @@ namespace Netch.Forms
 
             if (!string.IsNullOrEmpty(text))
             {
-                if (country != "")
-                {
-                    NatTypeStatusLabel.Text = String.Format("NAT{0}{1} [{2}]", i18N.Translate(": "), text, country);
-                }
-                else
-                {
-                    NatTypeStatusLabel.Text = String.Format("NAT{0}{1}", i18N.Translate(": "), text);
-                }
+                NatTypeStatusLabel.Text = $"NAT{i18N.Translate(": ")}{text} {(country != string.Empty ? $"[{country}]" : "")}";
 
-                if (int.TryParse(text, out int natType))
+                if (int.TryParse(text, out var natType))
                 {
                     if (natType > 0 && natType < 5)
                     {
@@ -147,36 +132,6 @@ namespace Netch.Forms
             }
 
             NatTypeStatusLabel.Visible = true;
-        }
-
-        /// <summary>
-        ///     更新 NAT指示灯颜色
-        /// </summary>
-        /// <param name="natType"></param>
-        private void UpdateNatTypeLight(STUN_Client.NatType natType)
-        {
-            Color c;
-            switch (natType)
-            {
-                case STUN_Client.NatType.UdpBlocked:
-                case STUN_Client.NatType.SymmetricUdpFirewall:
-                case STUN_Client.NatType.Symmetric:
-                    c = Color.Red;
-                    break;
-                case STUN_Client.NatType.RestrictedCone:
-                case STUN_Client.NatType.PortRestrictedCone:
-                    c = Color.Yellow;
-                    break;
-                case STUN_Client.NatType.OpenInternet:
-                case STUN_Client.NatType.FullCone:
-                    c = Color.LimeGreen;
-                    break;
-                default:
-                    c = Color.Black;
-                    break;
-            }
-
-            NatTypeStatusLightLabel.ForeColor = c;
         }
 
         /// <summary>
@@ -226,6 +181,38 @@ namespace Netch.Forms
         public void StatusTextAppend(string text)
         {
             StatusLabel.Text += text;
+        }
+
+        public static class StatusPortInfoText
+        {
+            public static int Socks5Port = 0;
+            public static int HttpPort = 0;
+            public static bool ShareLan = false;
+
+            public static string Value
+            {
+                get
+                {
+                    if (Socks5Port == 0 && HttpPort == 0)
+                        return string.Empty;
+
+                    var text = new StringBuilder();
+                    if (ShareLan)
+                        text.Append(i18N.Translate("Allow other Devices to connect") + " ");
+
+                    if (Socks5Port != 0)
+                        text.Append($"Socks5 {i18N.Translate("Local Port", ": ")}{Socks5Port}");
+
+                    if (HttpPort != 0)
+                    {
+                        if (Socks5Port != 0)
+                            text.Append(" | ");
+                        text.Append($"HTTP {i18N.Translate("Local Port", ": ")}{HttpPort}");
+                    }
+
+                    return $" ({text})";
+                }
+            }
         }
     }
 }

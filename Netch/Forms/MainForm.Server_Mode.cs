@@ -1,10 +1,7 @@
 ﻿using System;
 using System.Drawing;
-using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Netch.Utils;
 
 namespace Netch.Forms
 {
@@ -68,6 +65,7 @@ namespace Netch.Forms
 
             ModeComboBox.Items.Clear();
             ModeComboBox.Items.AddRange(Global.Modes.ToArray());
+            ModeComboBox.Tag = null;
             SelectLastMode();
             _comboBoxInitialized = comboBoxInitialized;
         }

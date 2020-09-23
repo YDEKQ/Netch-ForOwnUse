@@ -17,7 +17,7 @@ namespace Netch.Controllers
 
         private static readonly string BinDriver = string.Empty;
         private static readonly string SystemDriver = $"{Environment.SystemDirectory}\\drivers\\netfilter2.sys";
-        private static string[] _sysDns = { };
+        private static string _sysDns;
 
         static NFController()
         {
@@ -164,10 +164,9 @@ namespace Netch.Controllers
                 if (!StartInstanceAuto(argument.ToString())) continue;
                 if (Global.Settings.ModifySystemDNS)
                 {
-                    //备份并替换系统DNS
-                    _sysDns = DNS.getSystemDns();
-                    string[] dns = {"1.1.1.1", "8.8.8.8"};
-                    DNS.SetDNS(dns);
+                    // 备份并替换系统 DNS
+                    _sysDns = DNS.OutboundDNS;
+                    DNS.OutboundDNS = "1.1.1.1,8.8.8.8";
                 }
 
                 return true;
@@ -285,9 +284,9 @@ namespace Netch.Controllers
             {
                 Task.Run(() =>
                 {
-                    if (Global.Settings.ModifySystemDNS)
-                        //恢复系统DNS
-                        DNS.SetDNS(_sysDns);
+                if (Global.Settings.ModifySystemDNS)
+                    //恢复系统DNS
+                    DNS.OutboundDNS = _sysDns;
                 }),
                 Task.Run(StopInstance),
                 Task.Run(() =>
