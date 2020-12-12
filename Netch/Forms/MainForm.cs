@@ -1,21 +1,21 @@
 using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using Netch.Controllers;
 using Netch.Forms.Mode;
-using Netch.Forms.Server;
 using Netch.Models;
 using Netch.Utils;
-using Trojan = Netch.Forms.Server.Trojan;
-using VMess = Netch.Forms.Server.VMess;
 
 namespace Netch.Forms
 {
     public partial class MainForm : Form
     {
-
         public MainForm()
         {
             InitializeComponent();
@@ -40,11 +40,20 @@ namespace Netch.Forms
 
         private void MainForm_Load(object sender, EventArgs e)
         {
+            AddAddServerToolStripMenuItems();
+
+            #region i18N Translations
+
+            _mainFormText.Add(UninstallServiceToolStripMenuItem.Name, new[] {"Uninstall {0}", "NF Service"});
+            _mainFormText.Add(UninstallTapDriverToolStripMenuItem.Name, new[] {"Uninstall {0}", "TUN/TAP driver"});
+
+            #endregion
+
             OnlyInstance.Called += OnCalled;
             // 计算 ComboBox绘制 目标宽度
             _eWidth = ServerComboBox.Width / 10;
 
-            Modes.Load();
+            ModeHelper.Load();
             InitMode();
             InitServer();
             _comboBoxInitialized = true;
@@ -55,10 +64,8 @@ namespace Netch.Forms
             // 隐藏 NatTypeStatusLabel
             NatTypeStatusText();
 
-            _sizeHeight = Size.Height;
             _configurationGroupBoxHeight = ConfigurationGroupBox.Height;
             _profileConfigurationHeight = ConfigurationGroupBox.Controls[0].Height / 3; // 因为 AutoSize, 所以得到的是Controls的总高度
-            _profileGroupboxHeight = ProfileGroupBox.Height;
             // 加载快速配置
             InitProfile();
 
@@ -167,6 +174,7 @@ namespace Netch.Forms
             {
                 i18N.Load(Global.Settings.Language);
                 InitText();
+                InitMode();
                 InitProfile();
             }
 
@@ -176,58 +184,89 @@ namespace Netch.Forms
             Show();
         }
 
+        private readonly Dictionary<string, object> _mainFormText = new Dictionary<string, object>();
+        private bool _textRecorded;
+
         private void InitText()
         {
-            ServerToolStripMenuItem.Text = i18N.Translate("Server");
-            ImportServersFromClipboardToolStripMenuItem.Text = i18N.Translate("Import Servers From Clipboard");
-            AddSocks5ServerToolStripMenuItem.Text = i18N.Translate("Add [Socks5] Server");
-            AddShadowsocksServerToolStripMenuItem.Text = i18N.Translate("Add [Shadowsocks] Server");
-            AddShadowsocksRServerToolStripMenuItem.Text = i18N.Translate("Add [ShadowsocksR] Server");
-            AddVMessServerToolStripMenuItem.Text = i18N.Translate("Add [VMess] Server");
-            AddTrojanServerToolStripMenuItem.Text = i18N.Translate("Add [Trojan] Server");
-            ModeToolStripMenuItem.Text = i18N.Translate("Mode");
-            HelpToolStripMenuItem.Text = i18N.Translate("Help");
-            CreateProcessModeToolStripMenuItem.Text = i18N.Translate("Create Process Mode");
-            SubscribeToolStripMenuItem.Text = i18N.Translate("Subscribe");
-            ManageSubscribeLinksToolStripMenuItem.Text = i18N.Translate("Manage Subscribe Links");
-            UpdateServersFromSubscribeLinksToolStripMenuItem.Text = i18N.Translate("Update Servers From Subscribe Links");
-            OptionsToolStripMenuItem.Text = i18N.Translate("Options");
-            ReloadModesToolStripMenuItem.Text = i18N.Translate("Reload Modes");
-            UninstallServiceToolStripMenuItem.Text = i18N.Translate("Uninstall NF Service");
-            CleanDNSCacheToolStripMenuItem.Text = i18N.Translate("Clean DNS Cache");
-            UpdateACLToolStripMenuItem.Text = i18N.Translate("Update ACL");
-            updateACLWithProxyToolStripMenuItem.Text = i18N.Translate("Update ACL with proxy");
-            reinstallTapDriverToolStripMenuItem.Text = i18N.Translate("Reinstall TUN/TAP driver");
-            CheckForUpdatesToolStripMenuItem.Text = i18N.Translate("Check for updates");
-            OpenDirectoryToolStripMenuItem.Text = i18N.Translate("Open Directory");
-            AboutToolStripButton.Text = i18N.Translate("About");
-            fAQToolStripMenuItem.Text = i18N.Translate("FAQ");
-            NewVersionLabel.Text = i18N.Translate("New version available");
-            // VersionLabel.Text = i18N.Translate("xxx");
-            exitToolStripMenuItem.Text = i18N.Translate("Exit");
-            ConfigurationGroupBox.Text = i18N.Translate("Configuration");
-            ProfileLabel.Text = i18N.Translate("Profile");
-            ModeLabel.Text = i18N.Translate("Mode");
-            ServerLabel.Text = i18N.Translate("Server");
-            // UsedBandwidthLabel.Text = i18N.Translate("Used: 0 KB");
-            // DownloadSpeedLabel.Text = i18N.Translate("↓: 0 KB/s");
-            // UploadSpeedLabel.Text = i18N.Translate("↑: 0 KB/s");
-            NotifyIcon.Text = i18N.Translate("Netch");
-            ShowMainFormToolStripButton.Text = i18N.Translate("Show");
-            ExitToolStripButton.Text = i18N.Translate("Exit");
-            SettingsButton.Text = i18N.Translate("Settings");
-            ProfileGroupBox.Text = i18N.Translate("Profiles");
-            // 加载翻译
+            #region Record English
+
+            if (!_textRecorded)
+            {
+                void RecordText(Component component)
+                {
+                    try
+                    {
+                        switch (component)
+                        {
+                            case TextBoxBase _:
+                            case ListControl _:
+                                break;
+                            case Control c:
+                                _mainFormText.Add(c.Name, c.Text);
+                                break;
+                            case ToolStripItem c:
+                                _mainFormText.Add(c.Name, c.Text);
+                                break;
+                        }
+                    }
+                    catch (ArgumentException)
+                    {
+                        // ignored
+                    }
+                }
+
+                Utils.Utils.ComponentIterator(this, RecordText);
+                Utils.Utils.ComponentIterator(NotifyMenu, RecordText);
+                _textRecorded = true;
+            }
+
+            #endregion
+
+            #region Translate
+
+            void TranslateText(Component component)
+            {
+                switch (component)
+                {
+                    case TextBoxBase _:
+                    case ListControl _:
+                        break;
+                    case Control c:
+                        if (_mainFormText.ContainsKey(c.Name))
+                            c.Text = ControlText(c.Name);
+                        break;
+                    case ToolStripItem c:
+                        if (_mainFormText.ContainsKey(c.Name))
+                            c.Text = ControlText(c.Name);
+                        break;
+                }
+
+                string ControlText(string name)
+                {
+                    var value = _mainFormText[name];
+                    if (value.Equals(string.Empty)) return string.Empty;
+
+                    if (value is object[] values)
+                        return i18N.TranslateFormat(values.First() as string, values.Skip(1).ToArray());
+                    else
+                        return i18N.Translate(value);
+                }
+            }
+
+            Utils.Utils.ComponentIterator(this, TranslateText);
+            Utils.Utils.ComponentIterator(NotifyMenu, TranslateText);
+
+            #endregion
 
             UsedBandwidthLabel.Text = $@"{i18N.Translate("Used", ": ")}0 KB";
             State = State;
-
             VersionLabel.Text = @"DM bUg Ver" + UpdateChecker.Version;
         }
 
         private void Exit(bool forceExit = false)
         {
-            if (State != State.Waiting && State != State.Stopped && !Global.Settings.StopWhenExited && !forceExit)
+            if (!IsWaiting && !Global.Settings.StopWhenExited && !forceExit)
             {
                 MessageBoxX.Show(i18N.Translate("Please press Stop button first"));
 
@@ -237,13 +276,19 @@ namespace Netch.Forms
 
             Hide();
             NotifyIcon.Visible = false;
-            if (State != State.Waiting && State != State.Stopped)
+            if (!IsWaiting)
             {
-                // 已启动
                 ControlFun();
             }
 
             Configuration.Save();
+
+            foreach (var file in new[] {"data\\last.json", "data\\privoxy.conf"})
+            {
+                if (File.Exists(file))
+                    File.Delete(file);
+            }
+
             State = State.Terminating;
         }
 
@@ -282,17 +327,9 @@ namespace Netch.Forms
                 return;
             }
 
-            Form server = Global.Settings.Server[ServerComboBox.SelectedIndex].Type switch
-            {
-                "Socks5" => new Socks5(Global.Settings.Server[ServerComboBox.SelectedIndex]),
-                "SS" => new Shadowsocks(Global.Settings.Server[ServerComboBox.SelectedIndex]),
-                "SSR" => new ShadowsocksR(Global.Settings.Server[ServerComboBox.SelectedIndex]),
-                "VMess" => new VMess(Global.Settings.Server[ServerComboBox.SelectedIndex]),
-                "Trojan" => new Trojan(Global.Settings.Server[ServerComboBox.SelectedIndex]),
-                _ => null
-            };
             Hide();
-            server?.ShowDialog();
+            var server = Global.Settings.Server[ServerComboBox.SelectedIndex];
+            ServerHelper.GetUtilByTypeName(server.Type).Edit(server);
             InitServer();
             Configuration.Save();
             Show();
@@ -302,7 +339,6 @@ namespace Netch.Forms
         {
             Enabled = false;
             StatusText(i18N.Translate("Testing"));
-
             try
             {
                 await Task.Run(TestServer);
@@ -318,7 +354,7 @@ namespace Netch.Forms
         private void EditModePictureBox_Click(object sender, EventArgs e)
         {
             // 当前ModeComboBox中至少有一项
-            if (ModeComboBox.Items.Count <= 0 || ModeComboBox.SelectedIndex == -1)
+            if (ModeComboBox.SelectedIndex == -1)
             {
                 MessageBoxX.Show(i18N.Translate("Please select a mode first"));
                 return;
@@ -331,7 +367,6 @@ namespace Netch.Forms
                 {
                     Hide();
                     new Process(selectedMode).ShowDialog();
-                    InitMode();
                     Show();
                     break;
                 }
@@ -352,10 +387,7 @@ namespace Netch.Forms
                 return;
             }
 
-            var selectedMode = (Models.Mode) ModeComboBox.SelectedItem;
-            ModeComboBox.Items.Remove(selectedMode);
-            Modes.Delete(selectedMode);
-
+            ModeHelper.Delete((Models.Mode) ModeComboBox.SelectedItem);
             SelectLastMode();
         }
 
@@ -368,11 +400,21 @@ namespace Netch.Forms
                 return;
             }
 
-            var selectedMode = (Models.Server) ServerComboBox.SelectedItem;
             try
             {
                 //听说巨硬BUG经常会炸，所以Catch一下 :D
-                Clipboard.SetText(ShareLink.GetShareLink(selectedMode));
+                var server = (Server) ServerComboBox.SelectedItem;
+                string text;
+                if (ModifierKeys == Keys.Control)
+                {
+                    text = ShareLink.GetNetchLink(server);
+                }
+                else
+                {
+                    text = ShareLink.GetShareLink(server);
+                }
+
+                Clipboard.SetText(text);
             }
             catch (Exception)
             {
@@ -390,12 +432,9 @@ namespace Netch.Forms
             }
 
             var index = ServerComboBox.SelectedIndex;
-
-            Global.Settings.Server.Remove(ServerComboBox.SelectedItem as Models.Server);
+            Global.Settings.Server.Remove(ServerComboBox.SelectedItem as Server);
             InitServer();
-
             Configuration.Save();
-
             if (ServerComboBox.Items.Count > 0)
             {
                 ServerComboBox.SelectedIndex = index != 0 ? index - 1 : index;
@@ -433,7 +472,7 @@ namespace Netch.Forms
             Activate();
         }
 
-        private void NotifyTip(string text, int timeout = 0, bool info = true)
+        public void NotifyTip(string text, int timeout = 0, bool info = true)
         {
             // 会阻塞线程 timeout 秒
             NotifyIcon.ShowBalloonTip(timeout,

@@ -5,14 +5,14 @@ using System.Text;
 
 namespace Netch.Utils
 {
-    public class OnlyInstance
+    public static class OnlyInstance
     {
         public enum Commands
         {
             Show,
             Exit
         }
-        
+
         public static event EventHandler<Commands> Called;
 
         private static void OnCalled(Commands e)

@@ -4,13 +4,10 @@ using System.Text;
 
 namespace Netch.Controllers
 {
-    public class DNSController : Controller
+    public class DNSController : IController
     {
-        public DNSController()
-        {
-            Name = "DNS Service";
-            RedirectStd = false;
-        }
+
+        public string Name { get; set; } = "DNS Service";
 
         /// <summary>
         ///     启动DNS服务
@@ -18,16 +15,16 @@ namespace Netch.Controllers
         /// <returns></returns>
         public bool Start()
         {
-            if (!aiodns_dial(Encoding.UTF8.GetBytes(Path.GetFullPath("bin\\china_site_list")),
-                Encoding.UTF8.GetBytes("223.5.5.5:53"),
-                Encoding.UTF8.GetBytes("1.1.1.1:53"))
+            if (!aiodns_dial(Encoding.UTF8.GetBytes(Path.GetFullPath(Global.Settings.AioDNS.RulePath)),
+                Encoding.UTF8.GetBytes($"{Global.Settings.AioDNS.ChinaDNS}:53"),
+                Encoding.UTF8.GetBytes($"{Global.Settings.AioDNS.OtherDNS}:53"))
             )
                 return false;
             return
                 aiodns_init();
         }
 
-        public override void Stop()
+        public void Stop()
         {
             aiodns_free();
         }

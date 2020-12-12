@@ -1,14 +1,20 @@
 using System.IO;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace Netch.Utils
 {
-    public class WebUtil
+    public static class WebUtil
     {
+        static WebUtil()
+        {
+            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12 | SecurityProtocolType.Tls13;
+        }
+
         public const string DefaultUserAgent =
-            @"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.70 Safari/537.36";
+            @"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.67 Safari/537.36 Edg/87.0.664.55";
 
         private static int DefaultGetTimeout => Global.Settings.RequestTimeout;
 
@@ -24,6 +30,12 @@ namespace Netch.Utils
             return req;
         }
 
+        public static IPEndPoint BestLocalEndPoint(IPEndPoint remoteIPEndPoint)
+        {
+            var testSocket = new Socket(remoteIPEndPoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
+            testSocket.Connect(remoteIPEndPoint);
+            return (IPEndPoint) testSocket.LocalEndPoint;
+        }
 
         /// <summary>
         ///     异步下载
@@ -38,6 +50,22 @@ namespace Netch.Utils
 
             await input.CopyToAsync(memoryStream);
             return memoryStream.ToArray();
+        }
+
+        /// <summary>
+        ///     异步下载并编码为字符串
+        /// </summary>
+        /// <param name="req"></param>
+        /// <param name="rep"></param>
+        /// <param name="encoding">编码，默认UTF-8</param>
+        /// <returns></returns>
+        public static string DownloadString(HttpWebRequest req, out HttpWebResponse rep, string encoding = "UTF-8")
+        {
+            rep = (HttpWebResponse) req.GetResponse();
+            using var responseStream = rep.GetResponseStream();
+            using var streamReader = new StreamReader(responseStream, Encoding.GetEncoding(encoding));
+
+            return streamReader.ReadToEnd();
         }
 
         /// <summary>

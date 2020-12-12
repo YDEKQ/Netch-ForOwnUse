@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.WindowsAPICodePack.Dialogs;
+using Netch.Controllers;
 using Netch.Utils;
 
 namespace Netch.Forms.Mode
@@ -110,15 +111,8 @@ namespace Netch.Forms.Mode
 
         public void ModeForm_Load(object sender, EventArgs e)
         {
-            Text = i18N.Translate(Text);
-            ConfigurationGroupBox.Text = i18N.Translate(ConfigurationGroupBox.Text);
-            RemarkLabel.Text = i18N.Translate(RemarkLabel.Text);
-            FilenameLabel.Text = i18N.Translate(FilenameLabel.Text);
-            UseCustomFilenameBox.Text = i18N.Translate(UseCustomFilenameBox.Text);
-            AddButton.Text = i18N.Translate(AddButton.Text);
-            ScanButton.Text = i18N.Translate(ScanButton.Text);
-            ControlButton.Text = i18N.Translate(ControlButton.Text);
-            DeleteToolStripMenuItem.Text = i18N.Translate(DeleteToolStripMenuItem.Text);
+            i18N.TranslateForm(this);
+            i18N.Translate(contextMenuStrip);
         }
 
         /// <summary>
@@ -146,27 +140,29 @@ namespace Netch.Forms.Mode
         {
             await Task.Run(() =>
             {
-                if (!string.IsNullOrWhiteSpace(ProcessNameTextBox.Text))
-                {
-                    var process = ProcessNameTextBox.Text;
-                    if (!process.EndsWith(".exe"))
-                    {
-                        process += ".exe";
-                    }
-
-                    if (!RuleListBox.Items.Contains(process))
-                    {
-                        RuleListBox.Items.Add(process);
-                    }
-
-                    Edited = true;
-                    RuleListBox.SelectedIndex = RuleListBox.Items.IndexOf(process);
-                    ProcessNameTextBox.Text = string.Empty;
-                }
-                else
+                if (string.IsNullOrWhiteSpace(ProcessNameTextBox.Text))
                 {
                     MessageBoxX.Show(i18N.Translate("Please enter an process name (xxx.exe)"));
+                    return;
                 }
+
+                /*
+                if (!NFController.CheckCppRegex(ProcessNameTextBox.Text))
+                {
+                    MessageBoxX.Show("Rule does not conform to C++ regular expression syntax");
+                    return;
+                }*/
+
+                var process = ProcessNameTextBox.Text;
+
+                if (!RuleListBox.Items.Contains(process))
+                {
+                    RuleListBox.Items.Add(process);
+                }
+
+                Edited = true;
+                RuleListBox.SelectedIndex = RuleListBox.Items.IndexOf(process);
+                ProcessNameTextBox.Text = string.Empty;
             });
         }
 
@@ -214,13 +210,14 @@ namespace Netch.Forms.Mode
                 _mode.Rule.Clear();
                 _mode.Rule.AddRange(RuleListBox.Items.Cast<string>());
 
-                Modes.WriteFile(_mode);
+                ModeHelper.WriteFile(_mode);
+                Global.MainForm.InitMode();
                 Edited = false;
                 MessageBoxX.Show(i18N.Translate("Mode updated successfully"));
             }
             else
             {
-                var fullName = Modes.GetFullPath(FilenameTextBox.Text + ".txt");
+                var fullName = ModeHelper.GetFullPath(FilenameTextBox.Text + ".txt");
                 if (File.Exists(fullName))
                 {
                     MessageBoxX.Show(i18N.Translate("File already exists.\n Please Change the filename"));
@@ -236,8 +233,8 @@ namespace Netch.Forms.Mode
                 };
                 mode.Rule.AddRange(RuleListBox.Items.Cast<string>());
 
-                Modes.WriteFile(mode);
-                Modes.Add(mode);
+                ModeHelper.WriteFile(mode);
+                ModeHelper.Add(mode);
                 MessageBoxX.Show(i18N.Translate("Mode added successfully"));
             }
 

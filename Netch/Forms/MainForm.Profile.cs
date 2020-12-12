@@ -15,12 +15,8 @@ namespace Netch.Forms
 
     partial class MainForm
     {
-        /// init at <see cref="MainForm_Load"/> 
-        private int _sizeHeight;
-
-        private int _profileConfigurationHeight;
-        private int _profileGroupboxHeight;
         private int _configurationGroupBoxHeight;
+        private int _profileConfigurationHeight;
 
         private void InitProfile()
         {
@@ -41,7 +37,6 @@ namespace Netch.Forms
                 ProfileGroupBox.Visible = false;
 
                 ConfigurationGroupBox.Size = new Size(ConfigurationGroupBox.Size.Width, _configurationGroupBoxHeight - _profileConfigurationHeight);
-                Size = new Size(Size.Width, _sizeHeight - (_profileConfigurationHeight + _profileGroupboxHeight));
             }
             else
             {
@@ -75,23 +70,22 @@ namespace Netch.Forms
                     ProfileTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 1));
                 }
 
-                if (Size.Height == _sizeHeight) return;
                 configLayoutPanel.RowStyles[2].SizeType = SizeType.AutoSize;
                 ProfileGroupBox.Visible = true;
                 ConfigurationGroupBox.Size = new Size(ConfigurationGroupBox.Size.Width, _configurationGroupBoxHeight);
-                Size = new Size(Size.Width, _sizeHeight);
             }
         }
 
         private void LoadProfile(int index)
         {
             var p = Global.Settings.Profiles[index];
-            ProfileNameText.Text = p.ModeRemark;
+            ProfileNameText.Text = p.ProfileName;
+            ModeComboBox.ResetCompletionList();
 
             if (p.IsDummy)
                 throw new Exception("Profile not found.");
 
-            var server = ServerComboBox.Items.Cast<Models.Server>().FirstOrDefault(s => s.Remark.Equals(p.ServerRemark));
+            var server = ServerComboBox.Items.Cast<Server>().FirstOrDefault(s => s.Remark.Equals(p.ServerRemark));
             var mode = ModeComboBox.Items.Cast<Models.Mode>().FirstOrDefault(m => m.Remark.Equals(p.ModeRemark));
 
             if (server == null)
@@ -110,7 +104,7 @@ namespace Netch.Forms
 
         private void SaveProfile(int index)
         {
-            var selectedServer = (Models.Server) ServerComboBox.SelectedItem;
+            var selectedServer = (Server) ServerComboBox.SelectedItem;
             var selectedMode = (Models.Mode) ModeComboBox.SelectedItem;
             var name = ProfileNameText.Text;
 

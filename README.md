@@ -8,12 +8,13 @@
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 [![](https://img.shields.io/badge/Telegram-频道-blue)](https://t.me/Netch) [![](https://img.shields.io/badge/Telegram-讨论组-green)](https://t.me/Netch_Discuss_Group)
 [![Website](https://img.shields.io/website?url=https%3A%2F%2Fnetch.org)](https://netch.org/)
+[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
 游戏加速工具
 
 [网站](https://netch.org/)
 
-[FAQ/常见问题](https://netch.org/#/docs/zh-CN/faq)
+[常见问题](https://netch.org/#/docs/zh-CN/faq)
 
 ## 相比原版 Netch 新增特性
 
@@ -122,6 +123,7 @@ Netch 支持多种语言，在启动时会根据系统语言选择自身语言�
 
 ## 引用
 
+-   [aiodns](https://github.com/aiocloud/aiodns)
 -   [go-tun2socks](https://github.com/eycorsican/go-tun2socks)
 -   [shadowsocks-libev](https://github.com/shadowsocks/shadowsocks-libev)
 -   [shadowsocksr-libev](https://github.com/shadowsocksrr/shadowsocksr-libev)
@@ -129,7 +131,6 @@ Netch 支持多种语言，在启动时会根据系统语言选择自身语言�
 -   [trojan](https://github.com/trojan-gfw/trojan)
 -   [ACL4SSR](https://github.com/ACL4SSR/ACL4SSR)
 -   [dnsmasq-china-list](https://github.com/felixonmars/dnsmasq-china-list)
--   [unbound](https://github.com/NLnetLabs/unbound)
 -   [tap-windows6](https://github.com/OpenVPN/tap-windows6)
 -   [Privoxy](https://www.privoxy.org/)
 -   [NatTypeTester](https://github.com/HMBSbige/NatTypeTester)

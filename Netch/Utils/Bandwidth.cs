@@ -7,6 +7,8 @@ using Microsoft.Diagnostics.Tracing.Parsers;
 using Microsoft.Diagnostics.Tracing.Session;
 using Netch.Controllers;
 using Netch.Models;
+using Netch.Servers.Shadowsocks;
+using Netch.Servers.Socks5;
 
 namespace Netch.Utils
 {
@@ -49,14 +51,12 @@ namespace Netch.Utils
             return mStrSize;
         }
 
-        public static bool NetTrafficAvailable => /*Global.Settings.EnableNetTraffic && */Environment.OSVersion.Version.Major >= 10;
-
         /// <summary>
         /// 根据程序名统计流量
         /// </summary>
-        public static void NetTraffic(Server server, Mode mode)
+        public static void NetTraffic(in Server server, in Mode mode)
         {
-            if (!NetTrafficAvailable)
+            if (!Global.Flags.IsWindows10Upper)
                 return;
 
             var counterLock = new object();
@@ -64,22 +64,35 @@ namespace Netch.Utils
 
             //var processList = Process.GetProcessesByName(ProcessName).Select(p => p.Id).ToHashSet();
             var instances = new List<Process>();
-            if (server.Type.Equals("Socks5") && MainController.ModeController.Name == "HTTP")
+            switch (MainController.ServerController)
             {
-                instances.Add(((HTTPController) MainController.ModeController).pPrivoxyController.Instance);
+                case null:
+                    break;
+                case SSController ssController when ssController.DllFlag:
+                    instances.Add(Process.GetCurrentProcess());
+                    break;
+                case Guard instanceController:
+                    if (instanceController.Instance != null)
+                        instances.Add(instanceController.Instance);
+                    break;
             }
-            else if (server.Type.Equals("SS") && Global.Settings.BootShadowsocksFromDLL &&
-                     (mode.Type == 0 || mode.Type == 1 || mode.Type == 2))
+
+            if (!instances.Any())
             {
-                instances.Add(Process.GetCurrentProcess());
-            }
-            else if (MainController.EncryptedProxyController != null)
-            {
-                instances.Add(MainController.EncryptedProxyController.Instance);
-            }
-            else if (MainController.ModeController != null)
-            {
-                instances.Add(MainController.ModeController.Instance);
+                switch (MainController.ModeController)
+                {
+                    case null:
+                        break;
+                    case HTTPController httpController:
+                        instances.Add(httpController.pPrivoxyController.Instance);
+                        break;
+                    case NFController _:
+                        instances.Add(Process.GetCurrentProcess());
+                        break;
+                    case Guard instanceController:
+                        instances.Add(instanceController.Instance);
+                        break;
+                }
             }
 
             var processList = instances.Select(instance => instance.Id).ToList();

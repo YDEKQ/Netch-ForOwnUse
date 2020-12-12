@@ -2,7 +2,7 @@
 name: '错误报告'
 about: '创建错误报告以帮助我们改进'
 title: ''
-labels: 'Status: Review Needed'
+labels: '需要核实'
 assignees: ''
 
 ---

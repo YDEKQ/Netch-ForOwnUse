@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using Netch.Utils;
 
 namespace Netch.Models
 {
@@ -31,6 +33,20 @@ namespace Netch.Models
         /// </summary>
         public int Type = 0;
 
+        public bool SupportSocks5Auth => Type switch
+        {
+            0 => true,
+            _ => false
+        };
+
+        public bool TestNatRequired => Type switch
+        {
+            0 => true,
+            1 => true,
+            2 => true,
+            _ => false
+        };
+
         /// <summary>
         ///    绕过中国（0. 不绕过 1. 绕过）
         /// </summary>
@@ -40,6 +56,65 @@ namespace Netch.Models
         ///		规则
         /// </summary>
         public readonly List<string> Rule = new List<string>();
+
+        public List<string> FullRule
+        {
+            get
+            {
+                var result = new List<string>();
+                foreach (var s in Rule)
+                {
+                    if (string.IsNullOrWhiteSpace(s))
+                        continue;
+                    if (s.StartsWith("//"))
+                        continue;
+
+                    if (s.StartsWith("#include"))
+                    {
+                        var relativePath = new StringBuilder(s.Substring(8).Trim());
+                        relativePath.Replace("<", "");
+                        relativePath.Replace(">", "");
+                        relativePath.Replace(".h", ".txt");
+
+                        var mode = Global.Modes.FirstOrDefault(m => m.RelativePath.Equals(relativePath.ToString()));
+
+                        if (mode == null)
+                        {
+                            Logging.Warning($"{relativePath} file included in {Remark} not found");
+                        }
+                        else if (mode == this)
+                        {
+                            Logging.Warning("Can't self-reference");
+                        }
+                        else
+                        {
+                            if (mode.Type != Type)
+                            {
+                                Logging.Warning($"{mode.Remark}'s mode is not as same as {Remark}'s mode");
+                            }
+                            else
+                            {
+                                if (mode.Rule.Any(rule => rule.StartsWith("#include")))
+                                {
+                                    Logging.Warning("Cannot reference mode that reference other mode");
+                                }
+                                else
+                                {
+                                    result.AddRange(mode.FullRule);
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        result.Add(s);
+                    }
+                }
+
+                return result;
+            }
+        }
+
 
         /// <summary>
         ///    进程模式IP过滤器
@@ -56,7 +131,7 @@ namespace Netch.Models
         /// <returns>备注</returns>
         public override string ToString()
         {
-            return $"[{Type + 1}] {Remark}";
+            return $"[{Type + 1}] {i18N.Translate(Remark)}";
         }
 
         /// <summary>
@@ -65,30 +140,30 @@ namespace Netch.Models
         /// <returns>模式文件字符串</returns>
         public string ToFileString()
         {
-            string fileString;
+            StringBuilder fileString = new StringBuilder();
 
             switch (Type)
             {
                 case 0:
                     // 进程模式
-                    fileString = $"# {Remark}";
+                    fileString.Append($"# {Remark}");
                     break;
                 case 1:
                     // TUN/TAP 规则内 IP CIDR，无 Bypass China 设置
-                    fileString = $"# {Remark}, {Type}, 0";
+                    fileString.Append($"# {Remark}, {Type}, 0");
                     break;
                 default:
-                    fileString = $"# {Remark}, {Type}, {(BypassChina ? 1 : 0)}";
+                    fileString.Append($"# {Remark}, {Type}, {(BypassChina ? 1 : 0)}");
                     break;
             }
 
-            fileString += Global.EOF;
+            if (Rule.Any())
+            {
+                fileString.Append(Global.EOF);
+                fileString.Append(string.Join(Global.EOF, Rule));
+            }
 
-            fileString = Rule.Aggregate(fileString, (current, item) => $"{current}{item}{Global.EOF}");
-            // 去除最后的行尾符
-            fileString = fileString.Substring(0, fileString.Length - 2);
-
-            return fileString;
+            return fileString.ToString();
         }
 
         public string TypeToString()

@@ -1,7 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
-using System.Text;
-using Netch.Controllers;
+using System.Linq;
 using Netch.Models;
 using Netch.Utils;
 
@@ -13,6 +13,8 @@ namespace Netch.Forms
 
     partial class MainForm
     {
+        private bool IsWaiting => State == State.Waiting || State == State.Stopped;
+
         private State _state = State.Waiting;
 
         /// <summary>
@@ -34,10 +36,11 @@ namespace Netch.Forms
 
                     // 启动需要禁用的控件
                     UninstallServiceToolStripMenuItem.Enabled =
-                        updateACLWithProxyToolStripMenuItem.Enabled =
-                            UpdateServersFromSubscribeLinksToolStripMenuItem.Enabled =
-                                reinstallTapDriverToolStripMenuItem.Enabled =
-                                    ReloadModesToolStripMenuItem.Enabled = enabled;
+                        UpdateACLToolStripMenuItem.Enabled =
+                            updateACLWithProxyToolStripMenuItem.Enabled =
+                                UpdateServersFromSubscribeLinksToolStripMenuItem.Enabled =
+                                    UninstallTapDriverToolStripMenuItem.Enabled =
+                                        ReloadModesToolStripMenuItem.Enabled = enabled;
                 }
 
                 _state = value;
@@ -65,7 +68,7 @@ namespace Netch.Forms
 
                         ProfileGroupBox.Enabled = true;
 
-                        UsedBandwidthLabel.Visible /*= UploadSpeedLabel.Visible*/ = DownloadSpeedLabel.Visible = Bandwidth.NetTrafficAvailable;
+                        UsedBandwidthLabel.Visible /*= UploadSpeedLabel.Visible*/ = DownloadSpeedLabel.Visible = Global.Flags.IsWindows10Upper;
                         break;
                     case State.Stopping:
                         ControlButton.Enabled = false;
@@ -113,18 +116,7 @@ namespace Netch.Forms
             {
                 NatTypeStatusLabel.Text = $"NAT{i18N.Translate(": ")}{text} {(country != string.Empty ? $"[{country}]" : "")}";
 
-                if (int.TryParse(text, out var natType))
-                {
-                    if (natType > 0 && natType < 5)
-                    {
-                        NatTypeStatusLightLabel.Visible = true;
-                        UpdateNatTypeLight(natType);
-                    }
-                }
-                else
-                {
-                    NatTypeStatusLightLabel.Visible = false;
-                }
+                UpdateNatTypeLight(int.TryParse(text, out var natType) ? natType : -1);
             }
             else
             {
@@ -138,29 +130,37 @@ namespace Netch.Forms
         ///     更新 NAT指示灯颜色
         /// </summary>
         /// <param name="natType"></param>
-        private void UpdateNatTypeLight(int natType)
+        private void UpdateNatTypeLight(int natType = -1)
         {
-            Color c;
-            switch (natType)
+            if (natType > 0 && natType < 5)
             {
-                case 1:
-                    c = Color.LimeGreen;
-                    break;
-                case 2:
-                    c = Color.Yellow;
-                    break;
-                case 3:
-                    c = Color.Red;
-                    break;
-                case 4:
-                    c = Color.Black;
-                    break;
-                default:
-                    c = Color.Black;
-                    break;
-            }
+                NatTypeStatusLightLabel.Visible = Global.Flags.IsWindows10Upper;
+                Color c;
+                switch (natType)
+                {
+                    case 1:
+                        c = Color.LimeGreen;
+                        break;
+                    case 2:
+                        c = Color.Yellow;
+                        break;
+                    case 3:
+                        c = Color.Red;
+                        break;
+                    case 4:
+                        c = Color.Black;
+                        break;
+                    default:
+                        c = Color.Black;
+                        break;
+                }
 
-            NatTypeStatusLightLabel.ForeColor = c;
+                NatTypeStatusLightLabel.ForeColor = c;
+            }
+            else
+            {
+                NatTypeStatusLightLabel.Visible = false;
+            }
         }
 
         /// <summary>
@@ -185,33 +185,48 @@ namespace Netch.Forms
 
         public static class StatusPortInfoText
         {
-            public static int Socks5Port = 0;
-            public static int HttpPort = 0;
-            public static bool ShareLan = false;
+            private static ushort? _socks5Port;
+            private static ushort? _httpPort;
+            private static bool _shareLan;
+
+            public static ushort HttpPort
+            {
+                set => _httpPort = value;
+            }
+
+            public static ushort Socks5Port
+            {
+                set => _socks5Port = value;
+            }
+
+            public static void UpdateShareLan() => _shareLan = Global.Settings.LocalAddress != "127.0.0.1";
 
             public static string Value
             {
                 get
                 {
-                    if (Socks5Port == 0 && HttpPort == 0)
-                        return string.Empty;
+                    var strings = new List<string>();
 
-                    var text = new StringBuilder();
-                    if (ShareLan)
-                        text.Append(i18N.Translate("Allow other Devices to connect") + " ");
-
-                    if (Socks5Port != 0)
-                        text.Append($"Socks5 {i18N.Translate("Local Port", ": ")}{Socks5Port}");
-
-                    if (HttpPort != 0)
+                    if (_socks5Port != null)
                     {
-                        if (Socks5Port != 0)
-                            text.Append(" | ");
-                        text.Append($"HTTP {i18N.Translate("Local Port", ": ")}{HttpPort}");
+                        strings.Add($"Socks5 {i18N.Translate("Local Port", ": ")}{_socks5Port}");
                     }
 
-                    return $" ({text})";
+                    if (_httpPort != null)
+                    {
+                        strings.Add($"HTTP {i18N.Translate("Local Port", ": ")}{_httpPort}");
+                    }
+
+                    if (!strings.Any())
+                        return string.Empty;
+
+                    return $" ({(_shareLan ? i18N.Translate("Allow other Devices to connect") + " " : "")}{string.Join(" | ", strings)})";
                 }
+            }
+
+            public static void Reset()
+            {
+                _httpPort = _socks5Port = null;
             }
         }
     }

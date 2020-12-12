@@ -14,8 +14,7 @@ namespace Netch.Forms
 
         private void AboutForm_Load(object sender, EventArgs e)
         {
-            Text = i18N.Translate(Text);
-            ChannelLabel.Text = i18N.Translate(ChannelLabel.Text);
+            i18N.TranslateForm(this);
         }
 
         private void NetchPictureBox_Click(object sender, EventArgs e)
