@@ -28,7 +28,6 @@ jobs:
         path: Netch\bin\x64\Release
 
     - name: Package
-      if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
       shell: pwsh
       run: |
         New-Item -ItemType Directory -Path C:\builtfiles -Force > $null
