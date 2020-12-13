@@ -263,7 +263,7 @@ namespace Netch.Models
         /// <summary>
         ///     UDPServerIndex
         /// </summary>
-        public int UDPServerIndex = 0;
+        public int UDPServerIndex = -1;
 
         /// <summary>
         ///     进程模式不代理UDP

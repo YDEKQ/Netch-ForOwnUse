@@ -100,19 +100,18 @@ namespace Netch.Forms
             BindCheckBox(ProcessWhitelistModeCheckbox,
                 s => Global.Settings.ProcessWhitelistMode = s,
                 Global.Settings.ProcessWhitelistMode);
-            
+
             BindCheckBox(ProcessNoProxyForUdpcheckBox,
                 s => Global.Settings.ProcessNoProxyForUdp = s,
                 Global.Settings.ProcessNoProxyForUdp);
-            
+
             BindCheckBox(PrintProxyIPCheckBox,
                 s => Global.Settings.ProcessProxyIPLog = s,
                 Global.Settings.ProcessProxyIPLog);
-            
+
             BindCheckBox(UDPServerCheckBox,
                 s => Global.Settings.UDPServer = s,
                 Global.Settings.UDPServer);
-
 
             #endregion
 
@@ -285,7 +284,8 @@ namespace Netch.Forms
             {
                 UDPServerComboBox.Items.Clear();
                 UDPServerComboBox.Items.AddRange(Global.Settings.Server.ToArray());
-                UDPServerComboBox.SelectedIndex = Global.Settings.UDPServerIndex;
+                if (UDPServerComboBox.Items.Count >= Global.Settings.UDPServerIndex + 1)
+                    UDPServerComboBox.SelectedIndex = Global.Settings.UDPServerIndex;
             }
         }
 
@@ -313,7 +313,6 @@ namespace Netch.Forms
 
         private void ControlButton_Click(object sender, EventArgs e)
         {
-
             Utils.Utils.ComponentIterator(this, component => Utils.Utils.ChangeControlForeColor(component, Color.Black));
 
 
@@ -375,6 +374,7 @@ namespace Netch.Forms
             Global.Settings.STUN_Server_Port = stunServerPort;
             Global.Settings.Language = LanguageComboBox.Text;
             Global.Settings.UDPServerIndex = UDPServerComboBox.SelectedIndex;
+
             #endregion
 
             Utils.Utils.RegisterNetchStartupItem();
