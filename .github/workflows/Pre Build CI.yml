@@ -7,43 +7,36 @@ jobs:
     name: Build
     runs-on: windows-latest
     steps:
-    - name: NuGet
-      uses: nuget/setup-nuget@v1
-
-    - name: MSBuild
-      uses: microsoft/setup-msbuild@v1.0.0
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.0.2
 
     - name: Checkout
       uses: actions/checkout@v2
-
-    - name: Update submodules
-      uses: snickerbockers/submodules-init@v4
-
-    - name: Restore NuGet Packages Cache
-      uses: actions/cache@v2
       with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('Netch/Netch.csproj') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
+        submodules: true
 
-    - name: Restore NuGet Package
-      run: nuget restore Netch.sln
-
-    - name: Build .NET 4.8
+    - name: Build Solution
       shell: pwsh
-      run: |
-        .\BUILD.ps1
-        New-Item -ItemType Directory -Path C:\builtfiles -Force > $null
-        Compress-Archive -Path Netch\bin\x64\Release\win-x64\* -DestinationPath C:\builtfiles\Netch.zip
-        echo "::set-env name=Netch_SHA256::$(.\GetSHA256.ps1 C:\builtfiles\Netch.zip)"
+      run: .\BUILD.ps1
 
-    - name: Upload
-      uses: actions/upload-artifact@v1
+    - name: Upload Artifact
+      continue-on-error: true
+      if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+      uses: actions/upload-artifact@v2
       with:
         name: Netch
-        path: Netch\bin\x64\Release\win-x64
-          
+        path: Netch\bin\x64\Release
+
+    - name: Package
+      if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Path C:\builtfiles -Force > $null
+        7z a -mx9 C:\builtfiles\Netch.7z .\Netch\bin\x64\Release\
+        7z rn C:\builtfiles\Netch.7z Release Netch
+        echo "Netch_SHA256=$(.\GetSHA256.ps1 C:\builtfiles\Netch.7z)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        echo "Netch_EXE_SHA256=$(.\GetSHA256.ps1 Netch\bin\x64\Release\Netch.exe)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
     - name: Release
       uses: softprops/action-gh-release@v1
       env:
@@ -54,7 +47,7 @@ jobs:
         prerelease: true
         draft: false
         files: |
-          C:\builtfiles\Netch.zip
+          C:\builtfiles\Netch.7z
         body: |
           [![](https://img.shields.io/badge/Telegram-Channel-blue)](https://t.me/Netch) [![](https://img.shields.io/badge/Telegram-Group-green)](https://t.me/Netch_Discuss_Group)
           
@@ -63,4 +56,4 @@ jobs:
           ## 校验和
           | 文件名 | SHA256 |
           | :- | :- |
-          | Netch.zip | ${{ env.Netch_SHA256 }} |
+          | Netch.7z | ${{ env.Netch_SHA256 }} |
