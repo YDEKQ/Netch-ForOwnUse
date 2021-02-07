@@ -5,6 +5,8 @@ using System.Linq;
 using Netch.Controllers;
 using Netch.Forms;
 using Netch.Models;
+using Netch.Servers.Shadowsocks;
+using Netch.Servers.Socks5;
 
 namespace Netch.Utils
 {
@@ -66,17 +68,19 @@ namespace Netch.Utils
 
                 if (i == 0)
                 {
+                    if (text.First() != '#')
+                        return;
                     try
                     {
-                        var splited = text.Substring(text.IndexOf('#') + 1).Split(',').Select(s => s.Trim()).ToArray();
+                        var splited = text.Substring(1).Split(',').Select(s => s.Trim()).ToArray();
 
                         mode.Remark = splited[0];
 
-                        var result = int.TryParse(splited.ElementAtOrDefault(1), out var type);
-                        mode.Type = result ? type : 0;
+                        var typeResult = int.TryParse(splited.ElementAtOrDefault(1), out var type);
+                        mode.Type = typeResult ? type : 0;
 
-                        var result1 = int.TryParse(splited.ElementAtOrDefault(2), out var bypassChina);
-                        mode.BypassChina = result1 && bypassChina == 1;
+                        var bypassChinaResult = int.TryParse(splited.ElementAtOrDefault(2), out var bypassChina);
+                        mode.BypassChina = mode.ClientRouting() && bypassChinaResult && bypassChina == 1;
                     }
                     catch
                     {
@@ -133,6 +137,21 @@ namespace Netch.Utils
 
             Global.Modes.Remove(mode);
             Global.MainForm.InitMode();
+        }
+
+
+        public static bool SkipServerController(Server server, Mode mode)
+        {
+            return mode.Type switch
+            {
+                0 => server switch
+                {
+                    Socks5 => true,
+                    Shadowsocks shadowsocks when !shadowsocks.HasPlugin() && Global.Settings.RedirectorSS => true,
+                    _ => false
+                },
+                _ => false
+            };
         }
 
         public static IModeController GetModeControllerByType(int type, out ushort? port, out string portName, out PortType portType)

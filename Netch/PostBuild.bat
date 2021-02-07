@@ -15,7 +15,6 @@ RD /S /Q %TargetDir%i18n >NUL 2>&1
 RD /S /Q %TargetDir%mode >NUL 2>&1
 
 XCOPY /s /Y %SolutionDir%binaries %TargetDir%bin\ >NUL
-XCOPY /s /Y %SolutionDir%binariesMod\* %TargetDir%bin\ >NUL
 XCOPY /s /Y %SolutionDir%translations\i18n %TargetDir%i18n\ >NUL
 XCOPY /s /Y %SolutionDir%modes\mode %TargetDir%mode\ >NUL
 

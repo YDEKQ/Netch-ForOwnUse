@@ -87,6 +87,7 @@
             this.ProfileTable = new System.Windows.Forms.TableLayoutPanel();
             this.flowLayoutPanel1 = new System.Windows.Forms.FlowLayoutPanel();
             this.ButtomControlContainerControl = new System.Windows.Forms.ContainerControl();
+            this.updatePACToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.MenuStrip.SuspendLayout();
             this.ConfigurationGroupBox.SuspendLayout();
             this.configLayoutPanel.SuspendLayout();
@@ -196,6 +197,7 @@
             this.CleanDNSCacheToolStripMenuItem,
             this.UpdateACLToolStripMenuItem,
             this.updateACLWithProxyToolStripMenuItem,
+            this.updatePACToolStripMenuItem,
             this.UninstallServiceToolStripMenuItem,
             this.UninstallTapDriverToolStripMenuItem});
             this.OptionsToolStripMenuItem.Margin = new System.Windows.Forms.Padding(0, 0, 0, 1);
@@ -441,6 +443,7 @@
             this.EditServerPictureBox.Location = new System.Drawing.Point(3, 3);
             this.EditServerPictureBox.Name = "EditServerPictureBox";
             this.EditServerPictureBox.Size = new System.Drawing.Size(16, 16);
+            this.EditServerPictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.EditServerPictureBox.TabIndex = 7;
             this.EditServerPictureBox.TabStop = false;
             this.EditServerPictureBox.Click += new System.EventHandler(this.EditServerPictureBox_Click);
@@ -452,6 +455,7 @@
             this.CopyLinkPictureBox.Location = new System.Drawing.Point(72, 3);
             this.CopyLinkPictureBox.Name = "CopyLinkPictureBox";
             this.CopyLinkPictureBox.Size = new System.Drawing.Size(18, 18);
+            this.CopyLinkPictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.CopyLinkPictureBox.TabIndex = 14;
             this.CopyLinkPictureBox.TabStop = false;
             this.CopyLinkPictureBox.Click += new System.EventHandler(this.CopyLinkPictureBox_Click);
@@ -463,6 +467,7 @@
             this.DeleteServerPictureBox.Location = new System.Drawing.Point(26, 3);
             this.DeleteServerPictureBox.Name = "DeleteServerPictureBox";
             this.DeleteServerPictureBox.Size = new System.Drawing.Size(16, 16);
+            this.DeleteServerPictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.DeleteServerPictureBox.TabIndex = 8;
             this.DeleteServerPictureBox.TabStop = false;
             this.DeleteServerPictureBox.Click += new System.EventHandler(this.DeleteServerPictureBox_Click);
@@ -474,6 +479,7 @@
             this.SpeedPictureBox.Location = new System.Drawing.Point(49, 3);
             this.SpeedPictureBox.Name = "SpeedPictureBox";
             this.SpeedPictureBox.Size = new System.Drawing.Size(16, 16);
+            this.SpeedPictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.SpeedPictureBox.TabIndex = 9;
             this.SpeedPictureBox.TabStop = false;
             this.SpeedPictureBox.Click += new System.EventHandler(this.SpeedPictureBox_Click);
@@ -501,6 +507,7 @@
             this.EditModePictureBox.Location = new System.Drawing.Point(3, 3);
             this.EditModePictureBox.Name = "EditModePictureBox";
             this.EditModePictureBox.Size = new System.Drawing.Size(16, 16);
+            this.EditModePictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.EditModePictureBox.TabIndex = 12;
             this.EditModePictureBox.TabStop = false;
             this.EditModePictureBox.Click += new System.EventHandler(this.EditModePictureBox_Click);
@@ -512,6 +519,7 @@
             this.DeleteModePictureBox.Location = new System.Drawing.Point(26, 3);
             this.DeleteModePictureBox.Name = "DeleteModePictureBox";
             this.DeleteModePictureBox.Size = new System.Drawing.Size(16, 16);
+            this.DeleteModePictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.DeleteModePictureBox.TabIndex = 13;
             this.DeleteModePictureBox.TabStop = false;
             this.DeleteModePictureBox.Click += new System.EventHandler(this.DeleteModePictureBox_Click);
@@ -691,6 +699,13 @@
             this.ButtomControlContainerControl.TabStop = false;
             this.ButtomControlContainerControl.Text = "groupBox1";
             // 
+            // updatePACToolStripMenuItem
+            // 
+            this.updatePACToolStripMenuItem.Name = "updatePACToolStripMenuItem";
+            this.updatePACToolStripMenuItem.Size = new System.Drawing.Size(220, 22);
+            this.updatePACToolStripMenuItem.Text = "Update PAC";
+            this.updatePACToolStripMenuItem.Click += new System.EventHandler(this.updatePACToolStripMenuItem_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(96F, 96F);
@@ -797,5 +812,6 @@
 
         private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel1;
         private System.Windows.Forms.ContainerControl ButtomControlContainerControl;
+        private System.Windows.Forms.ToolStripMenuItem updatePACToolStripMenuItem;
     }
 }

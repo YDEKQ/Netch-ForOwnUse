@@ -146,12 +146,11 @@ namespace Netch.Forms.Mode
                     return;
                 }
 
-                /*
                 if (!NFController.CheckCppRegex(ProcessNameTextBox.Text))
                 {
                     MessageBoxX.Show("Rule does not conform to C++ regular expression syntax");
                     return;
-                }*/
+                }
 
                 var process = ProcessNameTextBox.Text;
 

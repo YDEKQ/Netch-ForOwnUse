@@ -77,21 +77,25 @@ namespace Netch.Servers.VMess.Utils
 
                 if (mode.BypassChina)
                 {
-                    if (mode.Type > 2)
+                    switch (mode.Type)
                     {
-                        directRuleObject.domain.Add("geosite:cn");
-                    }
-
-                    if (mode.Type == 1 || mode.Type == 2)
-                    {
-                        if (Global.Flags.SupportFakeDns && Global.Settings.TUNTAP.UseFakeDNS)
-                            directRuleObject.domain.Add("geosite:cn");
-                        else
+                        case 0:
                             directRuleObject.ip.Add("geoip:cn");
+                            break;
+                        case 1:
+                        case 2:
+                            if (Global.Flags.SupportFakeDns && Global.Settings.TUNTAP.UseFakeDNS)
+                                directRuleObject.domain.Add("geosite:cn");
+                            else
+                                directRuleObject.ip.Add("geoip:cn");
+                            break;
+                        default:
+                            directRuleObject.domain.Add("geosite:cn");
+                            break;
                     }
                 }
 
-                if (mode.Type <= 2)
+                if (mode.Type is 0 or 1 or 2)
                 {
                     blockRuleObject.ip.Add("geoip:private");
                 }
@@ -306,7 +310,6 @@ namespace Netch.Servers.VMess.Utils
                     case "ws":
                         var wsSettings = new WsSettings
                         {
-                            connectionReuse = true,
                             headers = !string.IsNullOrWhiteSpace(server.Host)
                                 ? new Headers {Host = server.Host}
                                 : null,
@@ -351,7 +354,6 @@ namespace Netch.Servers.VMess.Utils
                         {
                             var tcpSettings = new TcpSettings
                             {
-                                connectionReuse = true,
                                 header = new Header
                                 {
                                     type = server.FakeType,

@@ -5,7 +5,6 @@
 [![版本](https://img.shields.io/github/v/release/NetchX/Netch)](https://github.com/NetchX/Netch/releases)
 [![下载](https://img.shields.io/github/downloads/NetchX/Netch/total.svg)](https://github.com/NetchX/Netch/releases)
 [![Netch CI](https://github.com/NetchX/Netch/workflows/Netch%20CI/badge.svg)](https://github.com/NetchX/Netch/actions)
-[![网站](https://img.shields.io/website?url=https%3A%2F%2Fnetch.org)](https://netch.org/)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
 游戏加速工具
@@ -69,9 +68,10 @@ Netch 支持多种语言，在启动时会根据系统语言选择自身语言�
 - [go-tun2socks](https://github.com/eycorsican/go-tun2socks)
 - [shadowsocks-libev](https://github.com/shadowsocks/shadowsocks-libev)
 - [shadowsocksr-libev](https://github.com/shadowsocksrr/shadowsocksr-libev)
-- [v2ray-core](https://github.com/v2ray/v2ray-core)
+- [v2ray-core](https://github.com/v2fly/v2ray-core)
 - [trojan](https://github.com/trojan-gfw/trojan)
 - [ACL4SSR](https://github.com/ACL4SSR/ACL4SSR)
+- [PAC](https://github.com/HMBSbige/Text_Translation/blob/master/ShadowsocksR/ss_white.pac)
 - [dnsmasq-china-list](https://github.com/felixonmars/dnsmasq-china-list)
 - [tap-windows6](https://github.com/OpenVPN/tap-windows6)
 - [Privoxy](https://www.privoxy.org/)

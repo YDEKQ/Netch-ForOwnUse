@@ -7,7 +7,7 @@ namespace Netch.Utils
 {
     public static class Firewall
     {
-        public static readonly string[] ProgramPath =
+        private static readonly string[] ProgramPath =
         {
             "bin/NTT.exe",
             "bin/Privoxy.exe",

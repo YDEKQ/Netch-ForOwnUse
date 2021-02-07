@@ -20,8 +20,10 @@ namespace Netch
         {
             if (args.Contains("-console"))
             {
-                NativeMethods.AllocConsole();
-                NativeMethods.AttachConsole(-1);
+                if (!NativeMethods.AttachConsole(-1))
+                {
+                    NativeMethods.AllocConsole();
+                }
             }
 
             // 创建互斥体防止多次运行
@@ -48,14 +50,14 @@ namespace Netch
                 i18N.Load(Global.Settings.Language);
 
                 // 检查是否已经运行
-                /*if (!mutex.WaitOne(0, false))
+                if (!mutex.WaitOne(0, false))
                 {
                     OnlyInstance.Send(OnlyInstance.Commands.Show);
                     Logging.Info("唤起单实例");
 
                     // 退出进程
                     Environment.Exit(1);
-                }*/
+                }
 
                 // 清理上一次的日志文件，防止淤积占用磁盘空间
                 if (Directory.Exists("logging"))

@@ -81,10 +81,16 @@
     "Modes have been reload": "模式已重载",
     "Clean DNS Cache": "清理 DNS 缓存",
     "DNS cache cleanup succeeded": "DNS 缓存清理成功",
+    
+    "Update PAC": "更新 PAC",
+    "PAC updated successfully": "PAC 更新成功",
+    "PAC update failed": "PAC 更新失败",
+    
     "Update ACL": "更新 ACL 规则",
     "Update ACL with proxy": "使用代理更新 ACL 规则",
     "ACL updated successfully": "ACL 更新成功",
     "ACL update failed": "ACL 更新失败",
+    
     "Open Directory": "打开目录",
 
     "About": "关于",
@@ -155,6 +161,7 @@
     "Update subscribeat when opened": "自动更新订阅",
     "SS DLL": "SS DLL",
     "Modify System DNS": "修改系统 DNS",
+    "No Proxy for Udp": "不代理Udp流量",
     "ProfileCount": "快捷配置数量",
     "ProfileCount value illegal. Try again.": "快捷配置数值非法。请重试。",
     "STUN_ServerPort value illegal. Try again.": "STUN 端口数值非法。请重试。",
@@ -167,7 +174,6 @@
     "STUN Server": "STUN 服务器",
     "STUN Server Port": "STUN 服务器端口",
     "Custom ACL": "自定义 ACL 规则",
-    "Process whitelist mode": "进程白名单模式（全局）",
     "Language": "语言",
     "Tap Network Sharing": "Tap 网络共享",
     "Resolve Server Hostname": "解析服务器主机名",

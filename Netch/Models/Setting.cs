@@ -156,6 +156,16 @@ namespace Netch.Models
         public int RequestTimeout = 10000;
 
         /// <summary>
+        ///     PAC URL
+        /// </summary>
+        public string Pac_Url = "";
+
+        /// <summary>
+        ///     PAC端口
+        /// </summary>
+        public int Pac_Port = 2803;
+
+        /// <summary>
         ///		HTTP 本地端口
         /// </summary>
         public ushort HTTPLocalPort = 2802;
@@ -241,6 +251,11 @@ namespace Netch.Models
         public string ACL = "https://raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/banAD.acl";
 
         /// <summary>
+        ///     GFWList
+        /// </summary>
+        public string GFWLIST = "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt";
+
+        /// <summary>
         ///     是否使用DLL启动Shadowsocks
         /// </summary>
         public bool BootShadowsocksFromDLL = true;
@@ -250,33 +265,12 @@ namespace Netch.Models
         /// </summary>
         public string Language = "System";
 
-        /// <summary>
-        ///     进程白名单模式
-        /// </summary>
-        public bool ProcessWhitelistMode = false;
-
-        /// <summary>
-        ///     TCP UDP分流
-        /// </summary>
-        public bool UDPServer = false;
-
-        /// <summary>
-        ///     UDPServerIndex
-        /// </summary>
-        public int UDPServerIndex = -1;
-
-        /// <summary>
-        ///     进程模式不代理UDP
-        /// </summary>
-        public bool ProcessNoProxyForUdp = false;
-
-        /// <summary>
-        ///     进程模式打印已代理IP日志 5s/次 在redirector.log中循环打印
-        /// </summary>
-        public bool ProcessProxyIPLog = false;
-        
         public V2rayConfig V2RayConfig = new V2rayConfig();
 
         public AioDNSConfig AioDNS = new AioDNSConfig();
+
+        public bool RedirectorSS = false;
+
+        public bool ProcessNoProxyForUdp = false;
     }
 }

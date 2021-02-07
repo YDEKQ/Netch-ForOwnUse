@@ -4,8 +4,9 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Win32;
 using Netch.Models;
-using Netch.Servers.Socks5;
 using Netch.Utils;
+using WindowsProxy;
+using Netch.Utils.HttpProxyHandler;
 
 namespace Netch.Controllers
 {
@@ -18,7 +19,7 @@ namespace Netch.Controllers
         private string prevBypass, prevHTTP, prevPAC;
         private bool prevEnabled;
 
-        public string Name { get; set; } = "HTTP";
+        public string Name { get; } = "HTTP";
 
         /// <summary>
         ///     启动
@@ -31,12 +32,28 @@ namespace Netch.Controllers
 
             try
             {
-                if (pPrivoxyController.Start(MainController.ServerController.Server, mode))
+                if (pPrivoxyController.Start(MainController.Server, mode))
                 {
                     Global.Job.AddProcess(pPrivoxyController.Instance);
                 }
 
-                if (mode.Type == 3) NativeMethods.SetGlobal($"127.0.0.1:{Global.Settings.HTTPLocalPort}", IEProxyExceptions);
+                if (mode.Type == 3)
+                {
+                    if (mode.BypassChina)
+                    {
+                        //启动PAC服务器
+                        PACServerHandle.InitPACServer("127.0.0.1");
+                    }
+                    else
+                    {
+                        using var service = new ProxyService
+                        {
+                            Server = $"127.0.0.1:{Global.Settings.HTTPLocalPort}",
+                            Bypass = IEProxyExceptions
+                        };
+                        service.Global();
+                    }
+                }
             }
             catch (Exception e)
             {
@@ -88,15 +105,29 @@ namespace Netch.Controllers
                 Task.Factory.StartNew(pPrivoxyController.Stop),
                 Task.Factory.StartNew(() =>
                 {
+                    PACServerHandle.Stop();
                     if (prevEnabled)
                     {
                         if (prevHTTP != "")
-                            NativeMethods.SetGlobal(prevHTTP, prevBypass);
+                        {
+                            using var service = new ProxyService
+                            {
+                                Server = prevHTTP,
+                                Bypass = prevBypass
+                            };
+                            service.Global();
+                        }
                         if (prevPAC != "")
-                            NativeMethods.SetURL(prevPAC);
+                        {
+                            using var service = new ProxyService
+                            {
+                                AutoConfigUrl = prevPAC
+                            };
+                            service.Pac();
+                        }
                     }
                     else
-                        NativeMethods.SetDIRECT();
+                        new ProxyService().Direct();
                 })
             };
             Task.WaitAll(tasks);

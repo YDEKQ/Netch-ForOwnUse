@@ -7,14 +7,13 @@ namespace Netch.Servers.Socks5
 {
     public class S5Controller : Guard, IServerController
     {
-        public override string Name { get; set; } = "Socks5";
+        public override string Name { get; protected set; } = "Socks5";
         public override string MainFile { get; protected set; } = "v2ray.exe";
 
         public bool Start(in Server s, in Mode mode)
         {
-            Server = s;
             var server = (Socks5) s;
-            if (server.Auth() && !mode.SupportSocks5Auth)
+            if (server.Auth())
             {
                 File.WriteAllText("data\\last.json", V2rayConfigUtils.GenerateClientConfig(s, mode));
                 if (StartInstanceAuto("-config ..\\data\\last.json"))
@@ -34,7 +33,6 @@ namespace Netch.Servers.Socks5
                 StopInstance();
         }
 
-        public Server Server { get; set; }
         public ushort? Socks5LocalPort { get; set; }
 
         public string LocalAddress { get; set; }

@@ -7,7 +7,7 @@ namespace Netch.Controllers
     public class DNSController : IController
     {
 
-        public string Name { get; set; } = "DNS Service";
+        public string Name { get; } = "DNS Service";
 
         /// <summary>
         ///     启动DNS服务

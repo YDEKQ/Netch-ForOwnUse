@@ -1,6 +1,7 @@
 using Netch.Utils;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -23,7 +24,6 @@ namespace Netch.Forms
         private void SettingForm_Load(object sender, EventArgs e)
         {
             TUNTAPUseCustomDNSCheckBox_CheckedChanged(null, null);
-            UDPServerCheckBox_CheckedChanged(null, null);
             Task.Run(() => BeginInvoke(new Action(() => UseFakeDNSCheckBox.Visible = Global.Flags.SupportFakeDns)));
         }
 
@@ -97,21 +97,13 @@ namespace Netch.Forms
                 s => Global.Settings.ModifiedDNS = s,
                 Global.Settings.ModifiedDNS);
 
-            BindCheckBox(ProcessWhitelistModeCheckbox,
-                s => Global.Settings.ProcessWhitelistMode = s,
-                Global.Settings.ProcessWhitelistMode);
+            BindCheckBox(RedirectorSSCheckBox,
+                s => Global.Settings.RedirectorSS = s,
+                Global.Settings.RedirectorSS);
 
-            BindCheckBox(ProcessNoProxyForUdpcheckBox,
+            BindCheckBox(NoProxyForUdpCheckBox,
                 s => Global.Settings.ProcessNoProxyForUdp = s,
                 Global.Settings.ProcessNoProxyForUdp);
-
-            BindCheckBox(PrintProxyIPCheckBox,
-                s => Global.Settings.ProcessProxyIPLog = s,
-                Global.Settings.ProcessProxyIPLog);
-
-            BindCheckBox(UDPServerCheckBox,
-                s => Global.Settings.UDPServer = s,
-                Global.Settings.UDPServer);
 
             #endregion
 
@@ -277,17 +269,6 @@ namespace Netch.Forms
             }
         }
 
-        private void UDPServerCheckBox_CheckedChanged(object sender, EventArgs e)
-        {
-            UDPServerComboBox.Enabled = UDPServerCheckBox.Checked;
-            if (UDPServerCheckBox.Checked)
-            {
-                UDPServerComboBox.Items.Clear();
-                UDPServerComboBox.Items.AddRange(Global.Settings.Server.ToArray());
-                if (UDPServerComboBox.Items.Count >= Global.Settings.UDPServerIndex + 1)
-                    UDPServerComboBox.SelectedIndex = Global.Settings.UDPServerIndex;
-            }
-        }
 
         private void InitSTUN()
         {
@@ -314,7 +295,6 @@ namespace Netch.Forms
         private void ControlButton_Click(object sender, EventArgs e)
         {
             Utils.Utils.ComponentIterator(this, component => Utils.Utils.ChangeControlForeColor(component, Color.Black));
-
 
             #region Check
 
@@ -373,7 +353,6 @@ namespace Netch.Forms
             Global.Settings.STUN_Server = stunServer;
             Global.Settings.STUN_Server_Port = stunServerPort;
             Global.Settings.Language = LanguageComboBox.Text;
-            Global.Settings.UDPServerIndex = UDPServerComboBox.SelectedIndex;
 
             #endregion
 

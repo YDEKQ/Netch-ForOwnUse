@@ -18,12 +18,29 @@ namespace Netch.Controllers
             private set => _serverController = value;
         }
 
+        public static IServerController UdpServerController
+        {
+            get => _udpServerController ?? _serverController;
+            set => _udpServerController = value;
+        }
+
+        /// TCP or Both Server
+        public static Server Server;
+
+        public static Server UdpServer
+        {
+            get => _udpServer ?? Server;
+            set => _udpServer = value;
+        }
+
+        private static Server _udpServer;
         public static IModeController ModeController { get; private set; }
 
         public static bool NttTested;
 
         private static readonly NTTController NTTController = new NTTController();
         private static IServerController _serverController;
+        private static IServerController _udpServerController;
 
         /// <summary>
         ///     启动
@@ -34,6 +51,7 @@ namespace Netch.Controllers
         public static async Task<bool> Start(Server server, Mode mode)
         {
             Logging.Info($"启动主控制器: {server.Type} [{mode.Type}]{mode.Remark}");
+            Server = server;
 
             if (server is Socks5 && mode.Type == 4)
             {
@@ -64,19 +82,22 @@ namespace Netch.Controllers
 
             try
             {
-                if (!await Task.Run(() => StartServer(server, mode, ref _serverController)))
+                if (!ModeHelper.SkipServerController(server, mode))
+                {
+                    if (!await Task.Run(() => StartServer(server, mode, ref _serverController)))
+                    {
+                        throw new StartFailedException();
+                    }
+
+                    StatusPortInfoText.UpdateShareLan();
+                }
+
+                if (!await StartMode(mode))
                 {
                     throw new StartFailedException();
                 }
 
-                StatusPortInfoText.UpdateShareLan();
-
-                if (!await StartMode(server, mode))
-                {
-                    throw new StartFailedException();
-                }
-
-                if (mode.TestNatRequired)
+                if (mode.TestNatRequired())
                     NatTest();
 
                 return true;
@@ -134,7 +155,7 @@ namespace Netch.Controllers
 
                 if (server is Socks5 socks5)
                 {
-                    if (socks5.Auth() && !mode.SupportSocks5Auth)
+                    if (socks5.Auth())
                         UsingPorts.Add(StatusPortInfoText.Socks5Port = controller.Socks5LocalPort());
                 }
                 else
@@ -148,7 +169,7 @@ namespace Netch.Controllers
             return false;
         }
 
-        private static async Task<bool> StartMode(Server server, Mode mode)
+        private static async Task<bool> StartMode(Mode mode)
         {
             ModeController = ModeHelper.GetModeControllerByType(mode.Type, out var port, out var portName, out var portType);
 
