@@ -18,11 +18,17 @@ namespace Netch
         [STAThread]
         public static void Main(string[] args)
         {
-            if (args.Contains("-console"))
+            if (!NativeMethods.AttachConsole(-1))
             {
                 NativeMethods.AllocConsole();
-                NativeMethods.AttachConsole(-1);
             }
+            //if (args.Contains("-console"))
+            //{
+            //    if (!NativeMethods.AttachConsole(-1))
+            //    {
+            //        NativeMethods.AllocConsole();
+            //    }
+            //}
 
             // 创建互斥体防止多次运行
             using (var mutex = new Mutex(false, "Global\\Netch"))

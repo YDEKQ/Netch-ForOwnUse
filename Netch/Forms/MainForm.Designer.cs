@@ -39,6 +39,7 @@
             this.SubscribeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.ManageSubscribeLinksToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.UpdateServersFromSubscribeLinksToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.UpdateServersFromSubscribeLinksWithProxyToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.OptionsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.OpenDirectoryToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.CleanDNSCacheToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -87,6 +88,7 @@
             this.ProfileTable = new System.Windows.Forms.TableLayoutPanel();
             this.flowLayoutPanel1 = new System.Windows.Forms.FlowLayoutPanel();
             this.ButtomControlContainerControl = new System.Windows.Forms.ContainerControl();
+            this.updatePACToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.MenuStrip.SuspendLayout();
             this.ConfigurationGroupBox.SuspendLayout();
             this.configLayoutPanel.SuspendLayout();
@@ -169,7 +171,8 @@
             // 
             this.SubscribeToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.ManageSubscribeLinksToolStripMenuItem,
-            this.UpdateServersFromSubscribeLinksToolStripMenuItem});
+            this.UpdateServersFromSubscribeLinksToolStripMenuItem,
+            this.UpdateServersFromSubscribeLinksWithProxyToolStripMenuItem});
             this.SubscribeToolStripMenuItem.Margin = new System.Windows.Forms.Padding(0, 0, 0, 1);
             this.SubscribeToolStripMenuItem.Name = "SubscribeToolStripMenuItem";
             this.SubscribeToolStripMenuItem.Size = new System.Drawing.Size(77, 21);
@@ -189,6 +192,13 @@
             this.UpdateServersFromSubscribeLinksToolStripMenuItem.Text = "Update Servers From Subscribe Links";
             this.UpdateServersFromSubscribeLinksToolStripMenuItem.Click += new System.EventHandler(this.UpdateServersFromSubscribeLinksToolStripMenuItem_Click);
             // 
+            // UpdateServersFromSubscribeLinksWithProxyToolStripMenuItem
+            // 
+            this.UpdateServersFromSubscribeLinksWithProxyToolStripMenuItem.Name = "UpdateServersFromSubscribeLinksWithProxyToolStripMenuItem";
+            this.UpdateServersFromSubscribeLinksWithProxyToolStripMenuItem.Size = new System.Drawing.Size(294, 22);
+            this.UpdateServersFromSubscribeLinksWithProxyToolStripMenuItem.Text = "Update Servers From Subscribe Links With Proxy";
+            this.UpdateServersFromSubscribeLinksWithProxyToolStripMenuItem.Click += new System.EventHandler(this.UpdateServersFromSubscribeLinksWithProxyToolStripMenuItem_Click);
+            // 
             // OptionsToolStripMenuItem
             // 
             this.OptionsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
@@ -196,6 +206,7 @@
             this.CleanDNSCacheToolStripMenuItem,
             this.UpdateACLToolStripMenuItem,
             this.updateACLWithProxyToolStripMenuItem,
+            this.updatePACToolStripMenuItem,
             this.UninstallServiceToolStripMenuItem,
             this.UninstallTapDriverToolStripMenuItem});
             this.OptionsToolStripMenuItem.Margin = new System.Windows.Forms.Padding(0, 0, 0, 1);
@@ -243,7 +254,7 @@
             this.UninstallTapDriverToolStripMenuItem.Name = "UninstallTapDriverToolStripMenuItem";
             this.UninstallTapDriverToolStripMenuItem.Size = new System.Drawing.Size(220, 22);
             this.UninstallTapDriverToolStripMenuItem.Text = "Uninstall TUN/TAP driver";
-            this.UninstallTapDriverToolStripMenuItem.Click += new System.EventHandler(this.reinstallTapDriverToolStripMenuItem_Click);
+            this.UninstallTapDriverToolStripMenuItem.Click += new System.EventHandler(this.UninstallTapDriverToolStripMenuItem_Click);
             // 
             // HelpToolStripMenuItem
             // 
@@ -441,6 +452,7 @@
             this.EditServerPictureBox.Location = new System.Drawing.Point(3, 3);
             this.EditServerPictureBox.Name = "EditServerPictureBox";
             this.EditServerPictureBox.Size = new System.Drawing.Size(16, 16);
+            this.EditServerPictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.EditServerPictureBox.TabIndex = 7;
             this.EditServerPictureBox.TabStop = false;
             this.EditServerPictureBox.Click += new System.EventHandler(this.EditServerPictureBox_Click);
@@ -452,6 +464,7 @@
             this.CopyLinkPictureBox.Location = new System.Drawing.Point(72, 3);
             this.CopyLinkPictureBox.Name = "CopyLinkPictureBox";
             this.CopyLinkPictureBox.Size = new System.Drawing.Size(18, 18);
+            this.CopyLinkPictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.CopyLinkPictureBox.TabIndex = 14;
             this.CopyLinkPictureBox.TabStop = false;
             this.CopyLinkPictureBox.Click += new System.EventHandler(this.CopyLinkPictureBox_Click);
@@ -463,6 +476,7 @@
             this.DeleteServerPictureBox.Location = new System.Drawing.Point(26, 3);
             this.DeleteServerPictureBox.Name = "DeleteServerPictureBox";
             this.DeleteServerPictureBox.Size = new System.Drawing.Size(16, 16);
+            this.DeleteServerPictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.DeleteServerPictureBox.TabIndex = 8;
             this.DeleteServerPictureBox.TabStop = false;
             this.DeleteServerPictureBox.Click += new System.EventHandler(this.DeleteServerPictureBox_Click);
@@ -474,6 +488,7 @@
             this.SpeedPictureBox.Location = new System.Drawing.Point(49, 3);
             this.SpeedPictureBox.Name = "SpeedPictureBox";
             this.SpeedPictureBox.Size = new System.Drawing.Size(16, 16);
+            this.SpeedPictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.SpeedPictureBox.TabIndex = 9;
             this.SpeedPictureBox.TabStop = false;
             this.SpeedPictureBox.Click += new System.EventHandler(this.SpeedPictureBox_Click);
@@ -501,6 +516,7 @@
             this.EditModePictureBox.Location = new System.Drawing.Point(3, 3);
             this.EditModePictureBox.Name = "EditModePictureBox";
             this.EditModePictureBox.Size = new System.Drawing.Size(16, 16);
+            this.EditModePictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.EditModePictureBox.TabIndex = 12;
             this.EditModePictureBox.TabStop = false;
             this.EditModePictureBox.Click += new System.EventHandler(this.EditModePictureBox_Click);
@@ -512,6 +528,7 @@
             this.DeleteModePictureBox.Location = new System.Drawing.Point(26, 3);
             this.DeleteModePictureBox.Name = "DeleteModePictureBox";
             this.DeleteModePictureBox.Size = new System.Drawing.Size(16, 16);
+            this.DeleteModePictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.DeleteModePictureBox.TabIndex = 13;
             this.DeleteModePictureBox.TabStop = false;
             this.DeleteModePictureBox.Click += new System.EventHandler(this.DeleteModePictureBox_Click);
@@ -691,6 +708,13 @@
             this.ButtomControlContainerControl.TabStop = false;
             this.ButtomControlContainerControl.Text = "groupBox1";
             // 
+            // updatePACToolStripMenuItem
+            // 
+            this.updatePACToolStripMenuItem.Name = "updatePACToolStripMenuItem";
+            this.updatePACToolStripMenuItem.Size = new System.Drawing.Size(220, 22);
+            this.updatePACToolStripMenuItem.Text = "Update PAC";
+            this.updatePACToolStripMenuItem.Click += new System.EventHandler(this.updatePACToolStripMenuItem_Click);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(96F, 96F);
@@ -785,6 +809,7 @@
         private System.Windows.Forms.ToolStripMenuItem UpdateACLToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem updateACLWithProxyToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem UpdateServersFromSubscribeLinksToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem UpdateServersFromSubscribeLinksWithProxyToolStripMenuItem;
         private System.Windows.Forms.ToolStripStatusLabel UploadSpeedLabel;
         private System.Windows.Forms.ToolStripStatusLabel UsedBandwidthLabel;
         private System.Windows.Forms.ToolStripLabel NewVersionLabel;
@@ -797,5 +822,6 @@
 
         private System.Windows.Forms.FlowLayoutPanel flowLayoutPanel1;
         private System.Windows.Forms.ContainerControl ButtomControlContainerControl;
+        private System.Windows.Forms.ToolStripMenuItem updatePACToolStripMenuItem;
     }
 }

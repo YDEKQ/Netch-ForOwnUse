@@ -2,10 +2,14 @@ using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using WindowsProxy;
 using Microsoft.Win32;
+using Netch.Forms;
 using Netch.Models;
 using Netch.Servers.Socks5;
+using Netch.Servers.Trojan;
 using Netch.Utils;
+using Netch.Utils.HttpProxyHandler;
 
 namespace Netch.Controllers
 {
@@ -13,7 +17,7 @@ namespace Netch.Controllers
     {
         public const string IEProxyExceptions = "localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*";
 
-        public PrivoxyController pPrivoxyController = new PrivoxyController();
+        public PrivoxyController pPrivoxyController = new();
 
         private string prevBypass, prevHTTP, prevPAC;
         private bool prevEnabled;
@@ -31,12 +35,26 @@ namespace Netch.Controllers
 
             try
             {
-                if (pPrivoxyController.Start(MainController.ServerController.Server, mode))
-                {
+                if (pPrivoxyController.Start(MainController.Server, mode))
                     Global.Job.AddProcess(pPrivoxyController.Instance);
-                }
 
-                if (mode.Type == 3) NativeMethods.SetGlobal($"127.0.0.1:{Global.Settings.HTTPLocalPort}", IEProxyExceptions);
+                if (mode.Type == 3)
+                {
+                    if (MainController.Server is Socks5 or Trojan && mode.BypassChina)
+                    {
+                        //启动PAC服务器
+                        PACServerHandle.InitPACServer("127.0.0.1");
+                    }
+                    else
+                    {
+                        using var service = new ProxyService
+                        {
+                            Server = $"127.0.0.1:{Global.Settings.HTTPLocalPort}",
+                            Bypass = IEProxyExceptions
+                        };
+                        service.Global();
+                    }
+                }
             }
             catch (Exception e)
             {
@@ -47,6 +65,48 @@ namespace Netch.Controllers
             }
 
             return true;
+        }
+
+        /// <summary>
+        ///     停止
+        /// </summary>
+        public void Stop()
+        {
+            var tasks = new[]
+            {
+                Task.Run(pPrivoxyController.Stop),
+                Task.Run(() =>
+                {
+                    using var service = new ProxyService();
+                    try
+                    {
+                        PACServerHandle.Stop();
+                        if (prevEnabled)
+                        {
+                            if (prevHTTP != "")
+                            {
+                                service.Server = prevHTTP;
+                                service.Bypass = prevBypass;
+                                service.Global();
+                            }
+                            if (prevPAC != "")
+                            {
+                                service.AutoConfigUrl = prevPAC;
+                                service.Pac();
+                            }
+                        }
+                        else
+                        {
+                            service.Direct();
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        Logging.Error($"{Name} 控制器出错:\n" + e);
+                    }
+                })
+            };
+            Task.WaitAll(tasks);
         }
 
         private void RecordPrevious()
@@ -76,30 +136,6 @@ namespace Netch.Controllers
                 prevEnabled = false;
                 prevPAC = prevHTTP = prevBypass = "";
             }
-        }
-
-        /// <summary>
-        ///     停止
-        /// </summary>
-        public void Stop()
-        {
-            var tasks = new[]
-            {
-                Task.Factory.StartNew(pPrivoxyController.Stop),
-                Task.Factory.StartNew(() =>
-                {
-                    if (prevEnabled)
-                    {
-                        if (prevHTTP != "")
-                            NativeMethods.SetGlobal(prevHTTP, prevBypass);
-                        if (prevPAC != "")
-                            NativeMethods.SetURL(prevPAC);
-                    }
-                    else
-                        NativeMethods.SetDIRECT();
-                })
-            };
-            Task.WaitAll(tasks);
         }
     }
 }

@@ -1,4 +1,3 @@
-using Netch.Utils;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -7,18 +6,21 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Netch.Utils;
 
 namespace Netch.Forms
 {
     public partial class SettingForm : Form
     {
+        private readonly Dictionary<Control, Func<string, bool>> _checkActions = new();
+
+        private readonly Dictionary<Control, Action<Control>> _saveActions = new();
         public SettingForm()
         {
             InitializeComponent();
             i18N.TranslateForm(this);
             InitValue();
         }
-
 
         private void SettingForm_Load(object sender, EventArgs e)
         {
@@ -59,17 +61,26 @@ namespace Netch.Forms
                 c => Global.Settings.ResolveServerHostname = c,
                 Global.Settings.ResolveServerHostname);
 
+            BindRadioBox(ICMPingRadioBtn,
+                _ => { },
+                !Global.Settings.ServerTCPing);
+
+            BindRadioBox(TCPingRadioBtn,
+                c => Global.Settings.ServerTCPing = c,
+                Global.Settings.ServerTCPing);
+
             BindTextBox<int>(ProfileCountTextBox,
                 i => i > -1,
                 i => Global.Settings.ProfileCount = i,
                 Global.Settings.ProfileCount);
-            BindCheckBox(TcpingAtStartedCheckBox,
-                b => Global.Settings.StartedTcping = b,
-                Global.Settings.StartedTcping);
-            BindTextBox<int>(DetectionIntervalTextBox,
-                i => i >= 0,
-                i => Global.Settings.StartedTcping_Interval = i,
-                Global.Settings.StartedTcping_Interval);
+            BindTextBox<int>(DetectionTickTextBox,
+                i => ServerHelper.DelayTestHelper.Range.InRange(i),
+                i => Global.Settings.DetectionTick = i,
+                Global.Settings.DetectionTick);
+            BindTextBox<int>(StartedPingIntervalTextBox,
+                _ => true,
+                i => Global.Settings.StartedPingInterval = i,
+                Global.Settings.StartedPingInterval);
 
             InitSTUN();
 
@@ -90,20 +101,22 @@ namespace Netch.Forms
                 b => Global.Settings.ModifySystemDNS = b,
                 Global.Settings.ModifySystemDNS);
 
-            ModifySystemDNSCheckBox_CheckedChanged(null, null);
-
             BindTextBox(ModifiedDNSTextBox,
                 s => DNS.TrySplit(s, out _, 2),
                 s => Global.Settings.ModifiedDNS = s,
                 Global.Settings.ModifiedDNS);
 
-            BindCheckBox(ProcessWhitelistModeCheckbox,
-                s => Global.Settings.ProcessWhitelistMode = s,
-                Global.Settings.ProcessWhitelistMode);
+            BindCheckBox(RedirectorSSCheckBox,
+                s => Global.Settings.RedirectorSS = s,
+                Global.Settings.RedirectorSS);
 
-            BindCheckBox(ProcessNoProxyForUdpcheckBox,
+            BindCheckBox(NoProxyForUdpCheckBox,
                 s => Global.Settings.ProcessNoProxyForUdp = s,
                 Global.Settings.ProcessNoProxyForUdp);
+
+            BindCheckBox(NoProxyForTcpCheckBox,
+                s => Global.Settings.ProcessNoProxyForTcp = s,
+                Global.Settings.ProcessNoProxyForTcp);
 
             BindCheckBox(PrintProxyIPCheckBox,
                 s => Global.Settings.ProcessProxyIPLog = s,
@@ -132,7 +145,6 @@ namespace Netch.Forms
             BindCheckBox(UseCustomDNSCheckBox,
                 b => { Global.Settings.TUNTAP.UseCustomDNS = b; },
                 Global.Settings.TUNTAP.UseCustomDNS);
-            TUNTAPUseCustomDNSCheckBox_CheckedChanged(null, null);
 
             BindTextBox(TUNTAPDNSTextBox,
                 s => !UseCustomDNSCheckBox.Checked || DNS.TrySplit(s, out _, 2),
@@ -235,9 +247,9 @@ namespace Netch.Forms
                 b => Global.Settings.CheckBetaUpdate = b,
                 Global.Settings.CheckBetaUpdate);
 
-            BindCheckBox(UpdateSubscribeatWhenOpenedCheckBox,
-                b => Global.Settings.UpdateSubscribeatWhenOpened = b,
-                Global.Settings.UpdateSubscribeatWhenOpened);
+            BindCheckBox(UpdateServersWhenOpenedCheckBox,
+                b => Global.Settings.UpdateServersWhenOpened = b,
+                Global.Settings.UpdateServersWhenOpened);
 
             #endregion
 
@@ -263,18 +275,12 @@ namespace Netch.Forms
 
         private void TUNTAPUseCustomDNSCheckBox_CheckedChanged(object sender, EventArgs e)
         {
-            TUNTAPDNSTextBox.Enabled = UseCustomDNSCheckBox.Checked;
-
             if (UseCustomDNSCheckBox.Checked)
-            {
                 TUNTAPDNSTextBox.Text = Global.Settings.TUNTAP.DNS.Any()
                     ? DNS.Join(Global.Settings.TUNTAP.DNS)
                     : "1.1.1.1";
-            }
             else
-            {
                 TUNTAPDNSTextBox.Text = "AioDNS";
-            }
         }
 
         private void UDPServerCheckBox_CheckedChanged(object sender, EventArgs e)
@@ -326,14 +332,13 @@ namespace Netch.Forms
             }
 
             if (!flag)
-            {
                 return;
-            }
 
+            #endregion
 
             #region CheckSTUN
 
-            var stunFlag = true;
+            var errFlag = false;
             var stunServer = string.Empty;
             ushort stunServerPort = 3478;
 
@@ -344,16 +349,14 @@ namespace Netch.Forms
                 stunServer = stun[0];
                 if (stun.Length > 1)
                     if (!ushort.TryParse(stun[1], out stunServerPort))
-                    {
-                        stunFlag = false;
-                    }
+                        errFlag = true;
             }
             else
             {
-                stunFlag = false;
+                errFlag = true;
             }
 
-            if (!stunFlag)
+            if (errFlag)
             {
                 Utils.Utils.ChangeControlForeColor(STUN_ServerComboBox, Color.Red);
                 return;
@@ -361,14 +364,10 @@ namespace Netch.Forms
 
             #endregion
 
-            #endregion
-
             #region Save
 
             foreach (var pair in _saveActions)
-            {
                 pair.Value.Invoke(pair.Key);
-            }
 
             Global.Settings.STUN_Server = stunServer;
             Global.Settings.STUN_Server_Port = stunServerPort;
@@ -438,17 +437,22 @@ namespace Netch.Forms
         private void BindCheckBox(CheckBox control, Action<bool> save, bool value)
         {
             control.Checked = value;
-            _checkActions.Add(control, s => true);
             _saveActions.Add(control, c => save.Invoke(((CheckBox) c).Checked));
         }
-
-        private readonly Dictionary<Control, Func<string, bool>> _checkActions = new Dictionary<Control, Func<string, bool>>();
-
-        private readonly Dictionary<Control, Action<Control>> _saveActions = new Dictionary<Control, Action<Control>>();
-
-        private void ModifySystemDNSCheckBox_CheckedChanged(object sender, EventArgs e)
+        private void BindRadioBox(RadioButton control, Action<bool> save, bool value)
         {
-            ModifiedDNSTextBox.Enabled = ModifySystemDNSCheckBox.Checked;
+            control.Checked = value;
+            _saveActions.Add(control, c => save.Invoke(((RadioButton) c).Checked));
+        }
+
+        private void NoProxyForUdpCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            if (NoProxyForUdpCheckBox.Checked) NoProxyForTcpCheckBox.Checked = false;
+        }
+
+        private void NoProxyForTcpCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            if (NoProxyForTcpCheckBox.Checked) NoProxyForUdpCheckBox.Checked = false;
         }
     }
 }

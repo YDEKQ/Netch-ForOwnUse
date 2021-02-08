@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
@@ -56,12 +57,20 @@ namespace Netch.Utils
             return timeout;
         }
 
+        public static async Task<int> ICMPing(IPAddress ip, int timeout = 1000)
+        {
+            var reply = new Ping().Send(ip, timeout);
+
+            if (reply?.Status == IPStatus.Success)
+                return Convert.ToInt32(reply.RoundtripTime);
+
+            return timeout;
+        }
+
         public static string GetCityCode(string Hostname)
         {
             if (Hostname.Contains(":"))
-            {
                 Hostname = Hostname.Split(':')[0];
-            }
 
             string Country;
             try
@@ -77,13 +86,9 @@ namespace Netch.Utils
                     var DnsResult = DNS.Lookup(Hostname);
 
                     if (DnsResult != null)
-                    {
                         Country = databaseReader.Country(DnsResult).Country.IsoCode;
-                    }
                     else
-                    {
                         Country = "Unknown";
-                    }
                 }
             }
             catch (Exception)
@@ -126,7 +131,10 @@ namespace Netch.Utils
             }
         }
 
-        public static string GetFileVersion(string file) => File.Exists(file) ? FileVersionInfo.GetVersionInfo(file).FileVersion : string.Empty;
+        public static string GetFileVersion(string file)
+        {
+            return File.Exists(file) ? FileVersionInfo.GetVersionInfo(file).FileVersion : string.Empty;
+        }
 
         public static bool SearchOutboundAdapter(bool logging = true)
         {
@@ -183,19 +191,12 @@ namespace Netch.Utils
             {
                 e.DrawBackground();
 
-                if (e.Index >= 0)
-                {
-                    var brush = new SolidBrush(cbx.ForeColor);
+                if (e.Index < 0)
+                    return;
 
-                    if ((e.State & DrawItemState.Selected) == DrawItemState.Selected)
-                        brush = SystemBrushes.HighlightText as SolidBrush;
-
-                    e.Graphics.DrawString(cbx.Items[e.Index].ToString(), cbx.Font, brush, e.Bounds, new StringFormat
-                    {
-                        LineAlignment = StringAlignment.Center,
-                        Alignment = StringAlignment.Center
-                    });
-                }
+                TextRenderer.DrawText(e.Graphics, cbx.Items[e.Index].ToString(), cbx.Font, e.Bounds,
+                    (e.State & DrawItemState.Selected) == DrawItemState.Selected ? SystemColors.HighlightText : cbx.ForeColor,
+                    TextFormatFlags.HorizontalCenter);
             }
         }
 
@@ -204,34 +205,32 @@ namespace Netch.Utils
             func.Invoke(component);
             switch (component)
             {
+                case ListView listView:
+                    // ListView sub item
+                    foreach (var item in listView.Columns.Cast<ColumnHeader>())
+                        ComponentIterator(item, func);
+
+                    break;
                 case ToolStripMenuItem toolStripMenuItem:
                     // Iterator Menu strip sub item
                     foreach (var item in toolStripMenuItem.DropDownItems.Cast<ToolStripItem>())
-                    {
                         ComponentIterator(item, func);
-                    }
 
                     break;
                 case MenuStrip menuStrip:
                     // Menu Strip
                     foreach (var item in menuStrip.Items.Cast<ToolStripItem>())
-                    {
                         ComponentIterator(item, func);
-                    }
 
                     break;
                 case ContextMenuStrip contextMenuStrip:
                     foreach (var item in contextMenuStrip.Items.Cast<ToolStripItem>())
-                    {
                         ComponentIterator(item, func);
-                    }
 
                     break;
                 case Control control:
                     foreach (var c in control.Controls.Cast<Control>())
-                    {
                         ComponentIterator(c, func);
-                    }
 
                     if (control.ContextMenuStrip != null)
                         ComponentIterator(control.ContextMenuStrip, func);
@@ -268,7 +267,7 @@ namespace Netch.Utils
                 task.Principal.RunLevel = _TASK_RUNLEVEL.TASK_RUNLEVEL_HIGHEST;
 
                 task.Triggers.Create(_TASK_TRIGGER_TYPE2.TASK_TRIGGER_LOGON);
-                var action = (IExecAction) task.Actions.Create(_TASK_ACTION_TYPE.TASK_ACTION_EXEC);
+                var action = (IExecAction)task.Actions.Create(_TASK_ACTION_TYPE.TASK_ACTION_EXEC);
                 action.Path = Application.ExecutablePath;
 
 
@@ -276,7 +275,7 @@ namespace Netch.Utils
                 task.Settings.DisallowStartIfOnBatteries = false;
                 task.Settings.RunOnlyIfIdle = false;
 
-                folder.RegisterTaskDefinition("Netch Startup", task, (int) _TASK_CREATION.TASK_CREATE, null, null,
+                folder.RegisterTaskDefinition("Netch Startup", task, (int)_TASK_CREATION.TASK_CREATE, null, null,
                     _TASK_LOGON_TYPE.TASK_LOGON_INTERACTIVE_TOKEN, "");
             }
             else
@@ -292,9 +291,60 @@ namespace Netch.Utils
             {
                 case TextBox _:
                 case ComboBox _:
-                    if (((Control) component).ForeColor != color) ((Control) component).ForeColor = color;
+                    if (((Control)component).ForeColor != color) ((Control)component).ForeColor = color;
                     break;
             }
+        }
+        /// <summary>    
+        /// 获取操作系统已用的端口号    
+        /// </summary>        
+        /// <returns></returns>        
+        private static IList PortIsUsed()
+        {
+            //获取本地计算机的网络连接和通信统计数据的信息            
+            IPGlobalProperties ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
+
+            //返回本地计算机上的所有Tcp监听程序            
+            IPEndPoint[] ipsTCP = ipGlobalProperties.GetActiveTcpListeners();
+
+            //返回本地计算机上的所有UDP监听程序            
+            IPEndPoint[] ipsUDP = ipGlobalProperties.GetActiveUdpListeners();
+
+            //返回本地计算机上的Internet协议版本4(IPV4 传输控制协议(TCP)连接的信息。            
+            TcpConnectionInformation[] tcpConnInfoArray = ipGlobalProperties.GetActiveTcpConnections();
+
+            IList allPorts = new ArrayList();
+            foreach (IPEndPoint ep in ipsTCP)
+            {
+                allPorts.Add(ep.Port);
+            }
+            foreach (IPEndPoint ep in ipsUDP)
+            {
+                allPorts.Add(ep.Port);
+            }
+            foreach (TcpConnectionInformation conn in tcpConnInfoArray)
+            {
+                allPorts.Add(conn.LocalEndPoint.Port);
+            }
+            return allPorts;
+        }
+        /// <summary>
+        /// 获取随即可用端口
+        /// </summary>
+        /// <returns></returns>
+        public static int GetRandomPort()
+        {
+            IList HasUsedPort = PortIsUsed();
+            int port = 0;
+            bool IsRandomOk = true;
+            Random random = new Random((int)DateTime.Now.Ticks);
+            while (IsRandomOk)
+            {
+                port = random.Next(1024, 65535);
+                IsRandomOk = HasUsedPort.Contains(port);
+            }
+            return port;
+
         }
     }
 }

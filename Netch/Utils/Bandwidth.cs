@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
@@ -8,7 +7,6 @@ using Microsoft.Diagnostics.Tracing.Session;
 using Netch.Controllers;
 using Netch.Models;
 using Netch.Servers.Shadowsocks;
-using Netch.Servers.Socks5;
 
 namespace Netch.Utils
 {
@@ -54,7 +52,7 @@ namespace Netch.Utils
         /// <summary>
         /// 根据程序名统计流量
         /// </summary>
-        public static void NetTraffic(in Server server, in Mode mode)
+        public static void NetTraffic()
         {
             if (!Global.Flags.IsWindows10Upper)
                 return;
@@ -100,34 +98,47 @@ namespace Netch.Utils
             Logging.Info("流量统计进程:" + string.Join(",",
                 instances.Select(instance => $"({instance.Id})" + instance.ProcessName).ToArray()));
 
+            received = 0;
+
+            if (!instances.Any())
+                return;
+
+            Global.MainForm.BandwidthState(true);
+
             Task.Run(() =>
             {
-                tSession = new TraceEventSession("KernelAndClrEventsSession");
-                tSession.EnableKernelProvider(KernelTraceEventParser.Keywords.NetworkTCPIP);
-
-                //这玩意儿上传和下载得到的data是一样的:)
-                //所以暂时没办法区分上传下载流量
-                tSession.Source.Kernel.TcpIpRecv += data =>
+                try
                 {
-                    if (processList.Contains(data.ProcessID))
-                    {
-                        lock (counterLock)
-                            received += (ulong) data.size;
+                    tSession = new TraceEventSession("KernelAndClrEventsSession");
+                    tSession.EnableKernelProvider(KernelTraceEventParser.Keywords.NetworkTCPIP);
 
-                        // Debug.WriteLine($"TcpIpRecv: {ToByteSize(data.size)}");
-                    }
-                };
-                tSession.Source.Kernel.UdpIpRecv += data =>
+                    //这玩意儿上传和下载得到的data是一样的:)
+                    //所以暂时没办法区分上传下载流量
+                    tSession.Source.Kernel.TcpIpRecv += data =>
+                    {
+                        if (processList.Contains(data.ProcessID))
+                        {
+                            lock (counterLock)
+                                received += (ulong)data.size;
+
+                            // Debug.WriteLine($"TcpIpRecv: {ToByteSize(data.size)}");
+                        }
+                    };
+                    tSession.Source.Kernel.UdpIpRecv += data =>
+                    {
+                        if (processList.Contains(data.ProcessID))
+                        {
+                            lock (counterLock)
+                                received += (ulong)data.size;
+
+                            // Debug.WriteLine($"UdpIpRecv: {ToByteSize(data.size)}");
+                        }
+                    };
+                    tSession.Source.Process();
+                }
+                catch (System.Exception)
                 {
-                    if (processList.Contains(data.ProcessID))
-                    {
-                        lock (counterLock)
-                            received += (ulong) data.size;
-
-                        // Debug.WriteLine($"UdpIpRecv: {ToByteSize(data.size)}");
-                    }
-                };
-                tSession.Source.Process();
+                }
             });
 
             while (Global.MainForm.State != State.Stopped)

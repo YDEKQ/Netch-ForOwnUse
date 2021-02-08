@@ -5,6 +5,8 @@ using System.Linq;
 using Netch.Controllers;
 using Netch.Forms;
 using Netch.Models;
+using Netch.Servers.Shadowsocks;
+using Netch.Servers.Socks5;
 
 namespace Netch.Utils
 {
@@ -14,12 +16,21 @@ namespace Netch.Utils
 
         public static readonly string ModeDirectory = Path.Combine(Global.NetchDir, $"{MODE_DIR}\\");
 
-        public static string GetRelativePath(string fullName) => fullName.Substring(ModeDirectory.Length);
-        public static string GetFullPath(string relativeName) => Path.Combine(ModeDirectory, relativeName);
-        public static string GetFullPath(Mode mode) => Path.Combine(ModeDirectory, mode.RelativePath);
+        public static string GetRelativePath(string fullName)
+        {
+            return fullName.Substring(ModeDirectory.Length);
+        }
+        public static string GetFullPath(string relativeName)
+        {
+            return Path.Combine(ModeDirectory, relativeName);
+        }
+        public static string GetFullPath(Mode mode)
+        {
+            return Path.Combine(ModeDirectory, mode.RelativePath);
+        }
 
         /// <summary>
-        ///     从模式文件夹读取模式并为 <see cref="Forms.MainForm.ModeComboBox"/> 绑定数据
+        ///     从模式文件夹读取模式并为 <see cref="Forms.MainForm.ModeComboBox" /> 绑定数据
         /// </summary>
         public static void Load()
         {
@@ -66,17 +77,19 @@ namespace Netch.Utils
 
                 if (i == 0)
                 {
+                    if (text.First() != '#')
+                        return;
                     try
                     {
-                        var splited = text.Substring(text.IndexOf('#') + 1).Split(',').Select(s => s.Trim()).ToArray();
+                        var splited = text.Substring(1).Split(',').Select(s => s.Trim()).ToArray();
 
                         mode.Remark = splited[0];
 
-                        var result = int.TryParse(splited.ElementAtOrDefault(1), out var type);
-                        mode.Type = result ? type : 0;
+                        var typeResult = int.TryParse(splited.ElementAtOrDefault(1), out var type);
+                        mode.Type = typeResult ? type : 0;
 
-                        var result1 = int.TryParse(splited.ElementAtOrDefault(2), out var bypassChina);
-                        mode.BypassChina = result1 && bypassChina == 1;
+                        var bypassChinaResult = int.TryParse(splited.ElementAtOrDefault(2), out var bypassChina);
+                        mode.BypassChina = mode.ClientRouting() && bypassChinaResult && bypassChina == 1;
                     }
                     catch
                     {
@@ -95,16 +108,12 @@ namespace Netch.Utils
         public static void WriteFile(Mode mode)
         {
             if (!Directory.Exists(ModeDirectory))
-            {
                 Directory.CreateDirectory(ModeDirectory);
-            }
 
             var fullName = GetFullPath(mode.RelativePath ?? mode.FileName + ".txt");
 
             if (mode.RelativePath == null && File.Exists(fullName))
-            {
                 throw new Exception("新建模式的文件名已存在，请贡献者检查代码");
-            }
 
             // 写入到模式文件里
             File.WriteAllText(fullName, mode.ToFileString());
@@ -127,12 +136,25 @@ namespace Netch.Utils
         {
             var fullName = GetFullPath(mode);
             if (File.Exists(fullName))
-            {
                 File.Delete(fullName);
-            }
 
             Global.Modes.Remove(mode);
             Global.MainForm.InitMode();
+        }
+
+
+        public static bool SkipServerController(Server server, Mode mode)
+        {
+            return mode.Type switch
+            {
+                0 => server switch
+                {
+                    Socks5 => true,
+                    Shadowsocks shadowsocks when !shadowsocks.HasPlugin() && Global.Settings.RedirectorSS => true,
+                    _ => false
+                },
+                _ => false
+            };
         }
 
         public static IModeController GetModeControllerByType(int type, out ushort? port, out string portName, out PortType portType)
@@ -147,6 +169,7 @@ namespace Netch.Utils
                     modeController = new NFController();
                     port = Global.Settings.RedirectorTCPPort;
                     portName = "Redirector TCP";
+                    portType = PortType.TCP;
                     break;
                 case 1:
                 case 2:
@@ -157,6 +180,7 @@ namespace Netch.Utils
                     modeController = new HTTPController();
                     port = Global.Settings.HTTPLocalPort;
                     portName = "HTTP";
+                    portType = PortType.TCP;
                     MainForm.StatusPortInfoText.HttpPort = (ushort) port;
                     break;
                 case 4:

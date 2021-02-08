@@ -1,7 +1,7 @@
+using System;
 using System.Text;
 using Netch.Controllers;
 using Netch.Models;
-using Netch.Utils;
 
 namespace Netch.Servers.ShadowsocksR
 {
@@ -9,15 +9,18 @@ namespace Netch.Servers.ShadowsocksR
     {
         public override string MainFile { get; protected set; } = "ShadowsocksR.exe";
 
-        public override string Name { get; set; } = "ShadowsocksR";
+        public override string Name { get; protected set; } = "ShadowsocksR";
 
-        public Server Server { get; set; }
         public ushort? Socks5LocalPort { get; set; }
         public string LocalAddress { get; set; }
 
         public bool Start(in Server s, in Mode mode)
         {
-            Server = s;
+            if (mode.Type == -1)
+            {
+                Name += "_UDP";
+            }
+
             var server = (ShadowsocksR) s;
 
             #region Argument
@@ -40,7 +43,6 @@ namespace Netch.Servers.ShadowsocksR
             if (mode.BypassChina) argument.Append(" --acl default.acl");
 
             #endregion
-
             return StartInstanceAuto(argument.ToString());
         }
 

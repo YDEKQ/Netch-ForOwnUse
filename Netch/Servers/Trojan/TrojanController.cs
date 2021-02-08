@@ -3,7 +3,6 @@ using System.IO;
 using Netch.Controllers;
 using Netch.Models;
 using Netch.Servers.Trojan.Models;
-using Netch.Utils;
 using Newtonsoft.Json;
 
 namespace Netch.Servers.Trojan
@@ -17,17 +16,19 @@ namespace Netch.Servers.Trojan
         }
 
         public override string MainFile { get; protected set; } = "Trojan.exe";
-        public override string Name { get; set; } = "Trojan";
-        public Server Server { get; set; }
+        public override string Name { get; protected set; } = "Trojan";
         public ushort? Socks5LocalPort { get; set; }
         public string LocalAddress { get; set; }
 
 
         public bool Start(in Server s, in Mode mode)
         {
-            Server = s;
+            if (mode.Type == -1)
+            {
+                Name += "_UDP";
+            }
             var server = (Trojan) s;
-            File.WriteAllText("data\\last.json", JsonConvert.SerializeObject(new TrojanConfig
+            var trojanConfig = new TrojanConfig
             {
                 local_addr = this.LocalAddress(),
                 local_port = this.Socks5LocalPort(),
@@ -37,8 +38,15 @@ namespace Netch.Servers.Trojan
                 {
                     server.Password
                 }
-            }));
+            };
 
+            if (!string.IsNullOrWhiteSpace(server.Host))
+                trojanConfig.ssl.sni = server.Host;
+
+            File.WriteAllText("data\\last.json", JsonConvert.SerializeObject(trojanConfig, Formatting.Indented, new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            }));
             return StartInstanceAuto("-c ..\\data\\last.json");
         }
 

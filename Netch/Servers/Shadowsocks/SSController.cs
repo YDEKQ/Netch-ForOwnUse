@@ -8,22 +8,19 @@ namespace Netch.Servers.Shadowsocks
 {
     public class SSController : Guard, IServerController
     {
-        public override string Name { get; set; } = "Shadowsocks";
+        public override string Name { get; protected set; } = "Shadowsocks";
         public override string MainFile { get; protected set; } = "Shadowsocks.exe";
 
-        public Server Server { get; set; }
         public ushort? Socks5LocalPort { get; set; }
         public string LocalAddress { get; set; }
 
-        private Mode _savedMode;
         public bool DllFlag;
 
         public bool Start(in Server s, in Mode mode)
         {
-            _savedMode = mode;
-            Server = s;
             var server = (Shadowsocks) s;
-            DllFlag = Global.Settings.BootShadowsocksFromDLL && (_savedMode.Type == 0 || _savedMode.Type == 1 || _savedMode.Type == 2);
+
+            DllFlag = Global.Settings.BootShadowsocksFromDLL && mode.Type is 0 or 1 or 2 && !server.HasPlugin();
 
             //从DLL启动Shaowsocks
             if (DllFlag)
@@ -73,6 +70,11 @@ namespace Netch.Servers.Shadowsocks
 
             #endregion
 
+
+            if (mode.Type == -1)
+            {
+                Name += "UDP_";
+            }
             return StartInstanceAuto(argument.ToString());
         }
 
@@ -82,7 +84,6 @@ namespace Netch.Servers.Shadowsocks
                 ShadowsocksDLL.Stop();
             else
                 StopInstance();
-            _savedMode = null;
         }
 
         private class ShadowsocksDLL
